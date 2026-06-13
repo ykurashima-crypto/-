@@ -10,6 +10,7 @@ import { computeAlerts, moneySummary } from '../alerts.js';
 import { markInvoiced, markPaid } from '../money.js';
 import { CHANNELS } from './customers.js';
 import { renderCasesCalendar } from './calendar.js';
+import { micButton, parsePhone, parseDate } from '../voice.js';
 
 export function renderAdminHome() {
   // 請求・入金などの操作後に、ホームをその場で作り直して数字とアラートを最新化する。
@@ -208,9 +209,16 @@ function openQuickCaseForm(preset, onDone) {
     openPostRegister(rec, onDone);
   };
 
+  // 音声: 名前欄に話すと、電話番号・日付を自動で拾って各欄へ
+  const nameMic = micButton(nameEl, (val) => {
+    if (!phoneEl.value) { const p = parsePhone(val); if (p) phoneEl.value = p; }
+    if (!dateEl.value) { const d = parseDate(val); if (d) dateEl.value = d; }
+  });
+
   openModal('かんたん登録（3つだけ）', h('div', {}, [
-    h('p', { class: 'sub mt-0', text: 'まずはこの3つだけでOK。あとから詳しく足せます。' }),
-    h('div', { class: 'field' }, [h('label', { text: 'お客様の名前 / 現場名（必須）' }), nameEl]),
+    h('p', { class: 'sub mt-0', text: 'まずはこの3つだけでOK。🎤で話すと電話・日付も自動で拾います。' }),
+    h('div', { class: 'field' }, [h('label', { text: 'お客様の名前 / 現場名（必須）' }),
+      h('div', { class: 'field-mic' }, [nameEl, nameMic])]),
     h('div', { class: 'field' }, [h('label', { text: '電話番号' }), phoneEl]),
     h('div', { class: 'field' }, [h('label', { text: '次の予定日（連絡・現調など）' }), dateEl]),
     h('button', { class: 'btn', text: 'この内容で登録', onclick: save }),
@@ -269,7 +277,8 @@ export function openCaseForm(site, onDone, preset = null) {
     h('div', { class: 'grid-2' }, [input('surveyDate', '現調予定日', 'date'), input('constructionStart', '着工予定日', 'date')]),
     h('div', { class: 'grid-2' }, [input('workStart', '集合/作業開始', 'time'), input('workEnd', '作業終了予定', 'time')]),
     h('div', { class: 'field' }, [h('label', { text: 'ステータス' }), statusSel]),
-    h('div', { class: 'field' }, [h('label', { text: 'メモ' }), memo]),
+    h('div', { class: 'field' }, [h('label', { text: 'メモ（🎤 話して入力できます）' }),
+      h('div', { class: 'field-mic' }, [memo, micButton(memo)])]),
   ];
   const detailFields = editing ? [
     h('div', { class: 'section-title', text: '金額・日程（必要になったら入力）' }),

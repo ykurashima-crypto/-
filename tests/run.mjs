@@ -201,6 +201,38 @@ test('upcomingSteps は未完了を予定日順に', () => {
   assert.equal(up[0].processType, '下塗り');
 });
 
+group('音声入力ヘルパー（無料の簡易抽出）');
+test('parsePhone / parseDate', async () => {
+  const { parsePhone, parseDate } = await import(J('js/voice.js'));
+  assert.equal(parsePhone('田中さん 090-1234-5678 です'), '090-1234-5678');
+  const now = new Date('2026-06-13T09:00:00');
+  assert.equal(parseDate('明日きます', now), '2026-06-14');
+  assert.equal(parseDate('6月20日に', now), '2026-06-20');
+});
+
+group('追加工事（写真・金額・承認・請求連動）');
+test('extras が同期対象に含まれる', () => assert.ok(SYNC_COLLECTIONS.includes('extras')));
+test('承認済み・未請求の追加工事はタスクに出る', () => {
+  reset();
+  const s = store.insert('sites', { name: 'A', status: 'work' });
+  store.insert('extras', { siteId: s.id, content: '板金補修', amount: 22000, status: 'approved', billed: false });
+  store.insert('extras', { siteId: s.id, content: '未承認分', amount: 5000, status: 'pending', billed: false });
+  const { money } = computeAlerts(Date.parse('2026-06-13T09:00:00'));
+  const t = money.find((m) => m.title.includes('追加工事が未請求'));
+  assert.ok(t && t.action === 'invoice');
+});
+test('請求書に承認済み追加工事が明細・合計へ反映', () => {
+  reset();
+  const s = store.insert('sites', { id: 'inv1', name: '渡辺邸', customer: '渡辺', contractAmount: 110000 });
+  store.insert('extras', { siteId: 'inv1', content: '板金補修', amount: 22000, status: 'approved', billed: false });
+  store.insert('extras', { siteId: 'inv1', content: '却下分', amount: 9999, status: 'rejected' });
+  captured = '';
+  openInvoiceDoc(store.get('sites', 'inv1'));
+  assert.ok(captured.includes('追加工事：板金補修'));
+  assert.ok(captured.includes('¥132,000')); // 110000 + 22000
+  assert.ok(!captured.includes('却下分'));
+});
+
 group('写真分類 / 請求書連動');
 test('写真カテゴリは6種（施工前/中/後/材料缶/不具合/追加工事）', async () => {
   const { PHASES, phaseInfo } = await import(J('js/model.js'));

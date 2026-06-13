@@ -35,6 +35,10 @@ export function markInvoiced(site, onDone) {
       paymentStatus: 'unpaid',
       invoiceNote: note.value.trim(),
     });
+    // 承認済みの追加工事を「請求済み」にする（請求書にも反映済みのため）
+    for (const e of store.all('extras')) {
+      if (e.siteId === site.id && e.status === 'approved' && !e.billed) store.update('extras', e.id, { billed: true });
+    }
     toast('請求済みにしました 🧾');
     // 続けて請求書PDFを出せる導線（自動で開かず、本人に選ばせる）
     openModal('請求済みにしました ✅', h('div', {}, [

@@ -2,7 +2,7 @@
 // 依存ライブラリ・ビルド不要。ブラウザの印刷機能で「PDFとして保存」できる。
 // 日本語はシステムフォントで描画されるため文字化けしない。
 import { getCompany } from './company.js';
-import { getBlob } from './db.js';
+import { getBlob, store } from './db.js';
 import { phaseInfo } from './model.js';
 
 function esc(s) {
@@ -213,9 +213,16 @@ export async function openPhotoReportDoc(site, photos) {
 // 御請求書 PDF（site.contractAmount または見積合計を税込合計として扱う）
 export function openInvoiceDoc(site, opts = {}) {
   const c = getCompany();
-  const total = opts.total ?? site.contractAmount ?? site.estimateAmount ?? 0;
+  // 承認済みの追加工事を明細に含める（税込合計に加算）
+  const extras = store.all('extras').filter((e) => e.siteId === site.id && e.status === 'approved');
+  const extrasTotal = extras.reduce((a, e) => a + (e.amount || 0), 0);
+  const base = opts.total ?? site.contractAmount ?? site.estimateAmount ?? 0;
+  const total = base + extrasTotal;
   const subtotal = Math.round(total / 1.1);
   const tax = total - subtotal;
+  const baseSub = Math.round(base / 1.1);
+  const rows = `<tr><td>${esc(site.name)}</td><td class="center">一式</td><td class="num">${yen(baseSub)}</td></tr>`
+    + extras.map((e) => `<tr><td>追加工事：${esc(e.content || '')}</td><td class="center">一式</td><td class="num">${yen(Math.round((e.amount || 0) / 1.1))}</td></tr>`).join('');
 
   const inner = `
     <h1 class="doc-title">御 請 求 書</h1>
@@ -234,7 +241,7 @@ export function openInvoiceDoc(site, opts = {}) {
     <div class="total-box"><span class="lbl">御請求金額（税込）</span><span class="amt">${yen(total)}</span></div>
     <table>
       <thead><tr><th style="width:60%">品名</th><th style="width:20%">数量</th><th style="width:20%">金額</th></tr></thead>
-      <tbody><tr><td>${esc(site.name)}</td><td class="center">一式</td><td class="num">${yen(subtotal)}</td></tr></tbody>
+      <tbody>${rows}</tbody>
     </table>
     <table class="sums">
       <tr><td>小計</td><td class="num">${yen(subtotal)}</td></tr>

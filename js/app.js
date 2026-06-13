@@ -10,6 +10,7 @@ import { renderSurvey } from './views/survey.js';
 import { renderProcess } from './views/process.js';
 import { renderSchedule } from './views/schedule.js';
 import { renderPhotoReport } from './views/photoreport.js';
+import { renderApprove } from './views/extra.js';
 import { renderEstimate } from './views/estimate.js';
 import { renderSettings } from './views/settings.js';
 import { renderLogin } from './views/login.js';
@@ -53,6 +54,7 @@ const routes = {
   survey: (id) => renderSurvey(id),
   process: (id) => renderProcess(id),
   photodoc: (id) => renderPhotoReport(id),
+  approve: (id) => renderApprove(id),
   estimate: (id) => renderEstimate(id),
   settings: () => renderSettings(),
   site: (id) => renderSite(id),

@@ -30,11 +30,18 @@ export function computeAlerts(now = Date.now()) {
   const tomorrow = ymd(now + DAY);
   const sites = store.all('sites');
   const estimates = store.all('estimates');
+  const allExtras = store.all('extras');
   const money = [];
   const work = [];
 
   for (const s of sites) {
     const hasEstimate = s.estimateAmount != null || estimates.some((e) => e.siteId === s.id);
+    // 承認済みなのに未請求の追加工事（お金の漏れ）
+    const unbilledExtra = allExtras.filter((e) => e.siteId === s.id && e.status === 'approved' && !e.billed);
+    if (unbilledExtra.length) {
+      const sum = unbilledExtra.reduce((a, e) => a + (e.amount || 0), 0);
+      money.push(item(s, 'money', '➕', `追加工事が未請求（${unbilledExtra.length}件）`, `承認済みの追加工事 ${sum.toLocaleString()}円分が未請求です`, 'invoice'));
+    }
 
     // ── お金の漏れ ──────────────────────────
     // 完工したのに請求書がまだ（請求漏れ＝最重要）

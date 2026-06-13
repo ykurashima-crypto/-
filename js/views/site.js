@@ -10,8 +10,10 @@ import { navigate } from '../app.js';
 import { openCaseForm } from './admin.js';
 import { markInvoiced, markPaid } from '../money.js';
 import { openEstimateDoc, openInvoiceDoc } from '../doc.js';
+import { micButton } from '../voice.js';
 import { latestSurvey, surveySummary } from './survey.js';
 import { processProgress, siteProcesses, completeProcess } from './process.js';
+import { extraBlock } from './extra.js';
 
 // ---------- 現場詳細 ----------
 export function renderSite(siteId) {
@@ -96,6 +98,10 @@ export function renderSite(siteId) {
   // 工程（進捗サマリー）。職人も作業フェーズを確認できるよう全員に表示。
   const processSection = processBlock(s);
 
+  // 追加工事（管理者）。登録/承認後にこの画面を作り直す。
+  const rerenderSite = () => { const v = document.getElementById('view'); if (v) { clear(v); v.append(renderSite(siteId)); window.scrollTo(0, 0); } };
+  const extraSection = isAdmin ? extraBlock(s, rerenderSite) : null;
+
   // 管理者向け: 案件の編集・削除
   const adminActions = isAdmin
     ? h('div', { class: 'btn-row' }, [
@@ -124,6 +130,7 @@ export function renderSite(siteId) {
     moneyActions,
     surveySection,
     processSection,
+    extraSection,
     photoSection,
     reportSection,
     h('div', { class: 'section-title', text: '案件情報' }),
@@ -426,8 +433,8 @@ export function renderReportForm(arg) {
   };
 
   const problemField = h('div', { class: 'field' }, [
-    h('label', { text: '⚠️ 問題・追加工事の報告' }),
-    problemInput,
+    h('label', { text: '⚠️ 問題・追加工事の報告（🎤 話して入力できます）' }),
+    h('div', { class: 'field-mic' }, [problemInput, micButton(problemInput)]),
     h('div', { class: 'hint', text: '口頭依頼のトラブル防止のため、追加工事は写真とともに残しましょう' }),
   ]);
   if (issueFocus) problemInput.setAttribute('autofocus', 'true');
@@ -439,7 +446,8 @@ export function renderReportForm(arg) {
       h('div', { class: 'field' }, [h('label', { text: '作業時間（h）' }), hoursInput]),
     ]),
     h('div', { class: 'field' }, [h('label', { text: '作業者' }), workerInput]),
-    h('div', { class: 'field' }, [h('label', { text: '作業内容' }), contentInput]),
+    h('div', { class: 'field' }, [h('label', { text: '作業内容（🎤 話して入力できます）' }),
+      h('div', { class: 'field-mic' }, [contentInput, micButton(contentInput)])]),
     h('div', { class: 'field' }, [h('label', { text: '今日完了した工程' }), processSel,
       h('div', { class: 'hint', text: '選ぶと工程表の進捗が進みます（前倒し/遅れの判定にも反映）' })]),
     h('div', { class: 'field' }, [h('label', { text: '使用材料' }), materialInput]),
