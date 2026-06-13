@@ -1,0 +1,42 @@
+name: Deploy to GitHub Pages
+
+# 静的フロント(PWA)をGitHub Pagesへ自動デプロイする。
+# configure-pages の enablement:true により、Settings操作なしでPagesを有効化する。
+on:
+  push:
+    branches: ["claude/eager-pasteur-l55tr3"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # リポジトリ全体を配信（index.html等は相対パス構成のためサブパスでも動作）
+          path: "."
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
