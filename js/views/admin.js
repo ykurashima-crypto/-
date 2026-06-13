@@ -110,48 +110,55 @@ export function renderCases() {
   return h('div', {}, [
     h('div', { class: 'card-row' }, [
       h('h1', { class: 'page-title', text: '案件一覧' }),
-      h('button', { class: 'btn sm', text: '＋ 新規', onclick: () => openNewCase(renderList) }),
+      h('button', { class: 'btn sm', text: '＋ 新規', onclick: () => openCaseForm(null, renderList) }),
     ]),
     filterBar,
     listWrap,
   ]);
 }
 
-function openNewCase(refresh) {
+// 案件の新規登録・編集を兼ねるフォーム。site を渡すと編集、null なら新規。
+export function openCaseForm(site, onDone) {
+  const editing = !!site;
   const f = {};
   const input = (key, label, type = 'text', ph = '') => {
-    const el = h('input', { type, placeholder: ph });
+    const v = editing ? (site[key] ?? '') : '';
+    const el = h('input', { type, placeholder: ph, value: type === 'number' ? (v ?? '') : v });
     f[key] = el;
     return h('div', { class: 'field' }, [h('label', { text: label }), el]);
   };
-  const statusSel = h('select', {}, STATUSES.map((st) => h('option', { value: st.key, text: st.label })));
+  const statusSel = h('select', {}, STATUSES.map((st) =>
+    h('option', { value: st.key, selected: editing && site.status === st.key ? 'selected' : null, text: st.label })));
   f.status = statusSel;
 
   const form = h('div', {}, [
     input('name', '現場名 / 案件名', 'text', '例）田中様邸 外壁塗装'),
-    input('customer', '顧客名'),
-    h('div', { class: 'grid-2' }, [input('phone', '連絡先', 'tel'), input('manager', '担当')]),
-    input('address', '住所'),
+    input('customer', '顧客名', 'text', '例）田中 健一'),
+    h('div', { class: 'grid-2' }, [input('phone', '連絡先', 'tel', '090-...'), input('manager', '担当', 'text', '担当者名')]),
+    input('address', '住所', 'text', '市区町村〜番地'),
     h('div', { class: 'grid-2' }, [input('channel', '問合せ経路', 'text', 'チラシ/紹介/Web'), input('inquiryDate', '問合せ日', 'date')]),
-    h('div', { class: 'grid-2' }, [input('estimateAmount', '見積金額', 'number', '円'), input('nextContact', '次回連絡日', 'date')]),
+    h('div', { class: 'grid-2' }, [input('surveyDate', '現調日', 'date'), input('estimateDate', '見積提出日', 'date')]),
+    h('div', { class: 'grid-2' }, [input('estimateAmount', '見積金額', 'number', '円'), input('constructionStart', '着工予定日', 'date')]),
+    input('nextContact', '次回連絡日', 'date'),
     h('div', { class: 'field' }, [h('label', { text: 'ステータス' }), statusSel]),
     h('button', {
-      class: 'btn', text: '登録する',
+      class: 'btn', text: editing ? '更新する' : '登録する',
       onclick: () => {
         if (!f.name.value.trim()) { toast('現場名を入力してください'); return; }
-        store.insert('sites', {
+        const data = {
           name: f.name.value.trim(), customer: f.customer.value.trim(), phone: f.phone.value.trim(),
           manager: f.manager.value.trim(), address: f.address.value.trim(), channel: f.channel.value.trim(),
-          inquiryDate: f.inquiryDate.value, nextContact: f.nextContact.value, status: f.status.value,
+          inquiryDate: f.inquiryDate.value, surveyDate: f.surveyDate.value, estimateDate: f.estimateDate.value,
+          constructionStart: f.constructionStart.value, nextContact: f.nextContact.value, status: f.status.value,
           estimateAmount: f.estimateAmount.value ? parseInt(f.estimateAmount.value, 10) : null,
-          surveyDate: '', estimateDate: '', constructionStart: '',
-        });
-        toast('案件を登録しました');
+        };
+        if (editing) { store.update('sites', site.id, data); toast('案件を更新しました'); }
+        else { store.insert('sites', data); toast('案件を登録しました'); }
         document.getElementById('modal-root').replaceChildren();
-        refresh();
+        if (onDone) onDone();
       },
     }),
   ]);
 
-  openModal('新規案件', form);
+  openModal(editing ? '案件を編集' : '新規案件', form);
 }

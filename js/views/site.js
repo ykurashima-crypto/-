@@ -7,6 +7,7 @@ import {
   activeSites, yen, todayStr, fmtDate, fmtDateTime,
 } from '../model.js';
 import { navigate } from '../app.js';
+import { openCaseForm } from './admin.js';
 
 // ---------- 現場詳細 ----------
 export function renderSite(siteId) {
@@ -60,6 +61,22 @@ export function renderSite(siteId) {
     ? h('button', { class: 'btn secondary', text: '🧮 この現場の見積を作る', onclick: () => navigate('estimate/' + s.id) })
     : null;
 
+  // 管理者向け: 案件の編集・削除
+  const adminActions = isAdmin
+    ? h('div', { class: 'btn-row' }, [
+        h('button', { class: 'btn ghost', text: '✏️ 案件を編集', onclick: () => openCaseForm(s, () => navigate('site/' + s.id)) }),
+        h('button', {
+          class: 'btn danger', text: '🗑 削除',
+          onclick: () => {
+            if (!confirm(`「${s.name}」を削除しますか？\nこの操作は元に戻せません。`)) return;
+            store.remove('sites', s.id);
+            toast('案件を削除しました');
+            navigate('cases');
+          },
+        }),
+      ])
+    : null;
+
   return h('div', {}, [
     h('button', { class: 'btn ghost sm', text: '← 戻る', onclick: () => history.back() }),
     h('h1', { class: 'page-title', text: s.name }),
@@ -73,6 +90,7 @@ export function renderSite(siteId) {
     h('div', { class: 'section-title', text: '案件情報' }),
     infoCard,
     estimateBtn,
+    adminActions,
   ]);
 }
 

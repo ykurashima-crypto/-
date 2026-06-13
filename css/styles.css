@@ -57,7 +57,7 @@ body {
 
 /* View */
 .view {
-  padding: 16px 14px calc(var(--tabbar-h) + 24px);
+  padding: 16px 14px calc(var(--tabbar-h) + 40px);
   max-width: 760px; margin: 0 auto;
 }
 .page-title { font-size: 20px; font-weight: 700; margin: 4px 0 14px; }
@@ -68,11 +68,11 @@ body {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 30;
   height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
-  display: flex; background: var(--surface);
+  display: flex; justify-content: center; background: var(--surface);
   border-top: 1px solid var(--line);
 }
 .tabbar button {
-  flex: 1; border: 0; background: transparent; color: var(--muted);
+  flex: 1 1 0; max-width: 190px; border: 0; background: transparent; color: var(--muted);
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
   font-size: 11px; font-weight: 600; padding: 6px 2px;
 }
@@ -206,6 +206,7 @@ body {
   position: fixed; left: 50%; bottom: calc(var(--tabbar-h) + 20px); transform: translateX(-50%);
   background: #1c2733; color: #fff; padding: 10px 18px; border-radius: 999px; font-size: 14px;
   z-index: 60; box-shadow: 0 4px 16px rgba(0,0,0,.25); opacity: 0; transition: opacity .2s;
+  pointer-events: none; /* フェード後も残るが、下部のボタン操作を妨げない */
 }
 .toast.show { opacity: 1; }
 
