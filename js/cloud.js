@@ -28,6 +28,9 @@ export function cloudState() {
     role: profile?.role || null,
     companyId: profile?.company_id || null,
     fullName: profile?.full_name || null,
+    planType: profile?.companies?.plan_type || null,
+    companyName: profile?.companies?.name || null,
+    inviteCode: profile?.companies?.invite_code || null,
   };
 }
 export function currentRole() { return profile?.role || null; }
@@ -111,14 +114,43 @@ export async function signIn(email, password) {
   const { error } = await sb.auth.signInWithPassword({ email, password });
   if (error) throw error;
 }
+// 新規登録。メール確認が有効な場合はセッションが張られないことがある（その旨を呼び出し側に返す）。
+export async function signUp(email, password, fullName) {
+  const { data, error } = await sb.auth.signUp({
+    email, password, options: { data: { full_name: fullName || '' } },
+  });
+  if (error) throw error;
+  return { needsConfirm: !data.session };
+}
+export async function resetPassword(email) {
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+  if (error) throw error;
+}
 export async function signOut() {
   await sb.auth.signOut();
   session = null; profile = null; emit();
 }
 
+// 会社（事業者）を自分で作成し、自分をその管理者(owner相当)にする。
+// サーバー側の SECURITY DEFINER 関数 create_my_company で、未所属ユーザーのみ作成可能。
+export async function createMyCompany(name, planType) {
+  const { error } = await sb.rpc('create_my_company', { p_name: name, p_plan: planType });
+  if (error) throw error;
+  await loadProfile();
+  emit();
+}
+// 招待コードで既存の会社に参加する（家族補助者・職人）。
+export async function joinCompany(code) {
+  const { error } = await sb.rpc('join_company', { p_code: code });
+  if (error) throw error;
+  await loadProfile();
+  emit();
+}
+
 async function loadProfile() {
   const { data, error } = await sb.from('profiles')
-    .select('company_id, role, full_name').eq('id', session.user.id).single();
+    .select('company_id, role, full_name, companies(name, plan_type, invite_code)')
+    .eq('id', session.user.id).single();
   if (error) { console.warn('プロフィール取得失敗', error.message); profile = null; return; }
   profile = data;
 }

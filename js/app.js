@@ -11,6 +11,8 @@ import { renderProcess } from './views/process.js';
 import { renderEstimate } from './views/estimate.js';
 import { renderSettings } from './views/settings.js';
 import { renderLogin } from './views/login.js';
+import { renderOnboarding, renderCloudOnboarding } from './views/onboarding.js';
+import { isOnboarded } from './company.js';
 import { initSync, onSyncEvent, syncState, syncNow } from './sync.js';
 import { cloudEnabled, initCloud, cloudState, currentRole, onCloud, signOut } from './cloud.js';
 
@@ -75,11 +77,23 @@ function render() {
   const view = document.getElementById('view');
   const tabbar = document.getElementById('tabbar');
 
-  // 本番(クラウド)モードで未ログインならログイン画面のみ表示
-  if (cloudEnabled() && !cloudState().signedIn) {
-    clear(view);
-    tabbar.style.display = 'none';
-    view.append(renderLogin(() => { applyCloudRole(); render(); }));
+  // 本番(クラウド)モード: 未ログイン→ログイン/登録、ログイン済みで会社未所属→会社作成/参加
+  if (cloudEnabled()) {
+    const c = cloudState();
+    if (!c.signedIn) {
+      clear(view); tabbar.style.display = 'none';
+      view.append(renderLogin(() => { applyCloudRole(); render(); }));
+      return;
+    }
+    if (!c.companyId) {
+      clear(view); tabbar.style.display = 'none';
+      view.append(renderCloudOnboarding(() => { applyCloudRole(); render(); }));
+      return;
+    }
+  } else if (!isOnboarded()) {
+    // デモ(端末内保存)モード: 初回セットアップ
+    clear(view); tabbar.style.display = 'none';
+    view.append(renderOnboarding(() => render()));
     return;
   }
   tabbar.style.display = '';

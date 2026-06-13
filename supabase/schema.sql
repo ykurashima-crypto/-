@@ -122,6 +122,20 @@ alter table public.sites add column if not exists payment_status   text;
 -- 顧客への紐付け（クライアント採番の文字列IDも保持できるよう text）
 alter table public.sites add column if not exists customer_id      text;
 
+-- 会社テーブルの拡張（プラン区分・事業者情報・招待コード）
+alter table public.companies add column if not exists plan_type text not null default 'individual';
+alter table public.companies add column if not exists business_name text;
+alter table public.companies add column if not exists phone text;
+alter table public.companies add column if not exists postal_code text;
+alter table public.companies add column if not exists address text;
+alter table public.companies add column if not exists invoice_registration_number text;
+alter table public.companies add column if not exists logo_url text;
+alter table public.companies add column if not exists invite_code text;
+-- 招待コードを未設定の会社に発番（8桁HEX大文字、衝突回避のため一意制約）
+update public.companies set invite_code = upper(substr(encode(gen_random_bytes(4), 'hex'), 1, 8))
+  where invite_code is null;
+create unique index if not exists idx_companies_invite on public.companies(invite_code);
+
 -- 顧客テーブルの拡張（問合せ経路・問合せ日・連絡先など）
 alter table public.customers add column if not exists channel       text;
 alter table public.customers add column if not exists inquiry_date  date;
@@ -327,3 +341,38 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
+
+-- ─────────────────────────────────────────────
+-- セルフサービスのオンボーディング用 RPC（SECURITY DEFINER）
+--   未所属ユーザーだけが「会社を新規作成」または「招待コードで参加」できる。
+--   会社の物理作成や他人のprofiles更新はRLSで塞いだまま、ここだけ安全に許可する。
+-- ─────────────────────────────────────────────
+create or replace function public.create_my_company(p_name text, p_plan text default 'individual')
+returns uuid language plpgsql security definer set search_path = public as $$
+declare cid uuid; existing uuid;
+begin
+  if coalesce(trim(p_name), '') = '' then raise exception '会社名が必要です'; end if;
+  select company_id into existing from public.profiles where id = auth.uid();
+  if existing is not null then raise exception '既に会社に所属しています'; end if;
+  insert into public.companies (name, plan_type, invite_code)
+    values (p_name, case when p_plan = 'corporate' then 'corporate' else 'individual' end,
+            upper(substr(encode(gen_random_bytes(4), 'hex'), 1, 8)))
+    returning id into cid;
+  update public.profiles set company_id = cid, role = 'admin' where id = auth.uid();
+  return cid;
+end $$;
+
+create or replace function public.join_company(p_code text)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare cid uuid; existing uuid;
+begin
+  select company_id into existing from public.profiles where id = auth.uid();
+  if existing is not null then raise exception '既に会社に所属しています'; end if;
+  select id into cid from public.companies where invite_code = upper(trim(p_code));
+  if cid is null then raise exception '招待コードが見つかりません'; end if;
+  update public.profiles set company_id = cid, role = 'worker' where id = auth.uid();
+  return cid;
+end $$;
+
+grant execute on function public.create_my_company(text, text) to authenticated;
+grant execute on function public.join_company(text) to authenticated;

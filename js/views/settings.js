@@ -6,7 +6,7 @@ import {
   onSyncEvent, resetCursorsForFullSync,
 } from '../sync.js';
 import { cloudEnabled, cloudState, signOut, cloudSync } from '../cloud.js';
-import { getCompany, setCompany } from '../company.js';
+import { getCompany, setCompany, planLabel } from '../company.js';
 import { downscaleToBlob } from '../model.js';
 
 // 自社情報（見積書・請求書PDFのヘッダー／振込先に使う）の編集カード。
@@ -19,6 +19,14 @@ function companyCard() {
     return h('div', { class: 'field' }, [h('label', { text: label }), el]);
   };
   const bank = h('textarea', { placeholder: '例）〇〇銀行 △△支店 普通 1234567 ｶﾌﾞｼｷｶﾞｲｼｬ◯◯', style: 'min-height:56px' }, c.bank || '');
+
+  // プラン区分（個人/法人）
+  let plan = c.planType || 'individual';
+  const planBtns = h('div', { class: 'role-switch', style: 'width:100%' }, [
+    h('button', { class: plan === 'individual' ? 'active' : '', text: '個人プラン', onclick: (e) => { plan = 'individual'; pick(e); } }),
+    h('button', { class: plan === 'corporate' ? 'active' : '', text: '法人プラン', onclick: (e) => { plan = 'corporate'; pick(e); } }),
+  ]);
+  function pick(e) { planBtns.querySelectorAll('button').forEach((b) => b.classList.remove('active')); e.target.classList.add('active'); }
 
   // ロゴ（任意）。長辺240pxへ縮小してdataURLで保存（localStorage節約）。
   const logoImg = h('img', { alt: '', style: 'max-height:46px;border-radius:6px;' + (c.logo ? '' : 'display:none') });
@@ -41,6 +49,7 @@ function companyCard() {
       name: f.name.value.trim(), owner: f.owner.value.trim(), postalCode: f.postalCode.value.trim(),
       address: f.address.value.trim(), phone: f.phone.value.trim(), email: f.email.value.trim(),
       invoiceRegNo: f.invoiceRegNo.value.trim(), bank: bank.value.trim(), logo: logoState.dataUrl,
+      planType: plan,
     });
     toast('自社情報を保存しました');
   };
@@ -48,6 +57,7 @@ function companyCard() {
   return h('div', {}, [
     h('div', { class: 'section-title', text: '自社情報（見積書・請求書に使います）' }),
     h('div', { class: 'card' }, [
+      h('div', { class: 'field' }, [h('label', { text: 'プラン' }), planBtns]),
       field('name', '屋号 / 会社名', '例）伊藤塗装'),
       h('div', { class: 'grid-2' }, [field('owner', '代表者名', '例）伊藤 太郎'), field('phone', '電話番号', '090-...', 'tel')]),
       h('div', { class: 'grid-2' }, [field('postalCode', '郵便番号', '123-4567'), field('email', 'メール', '任意', 'email')]),
@@ -73,10 +83,16 @@ export function renderSettings() {
       h('h1', { class: 'page-title', text: 'アカウント' }),
       h('div', { class: 'card' }, [
         kvRow('ログイン', s.email || '—'),
+        kvRow('会社', s.companyName || '—'),
+        kvRow('プラン', s.planType ? planLabel(s.planType) : '—'),
         kvRow('役割', roleLabel),
-        kvRow('会社ID', s.companyId || '（管理者に割当を依頼）'),
         kvRow('保存先', 'クラウド（Supabase）'),
       ]),
+      s.inviteCode ? h('div', { class: 'card' }, [
+        h('div', { class: 'section-title mt-0', text: '家族・職人を招待' }),
+        h('p', { class: 'sub mt-0', text: 'このコードを伝えると、相手は新規登録後に「招待コードで参加」できます。' }),
+        h('div', { class: 'invite-code', text: s.inviteCode }),
+      ]) : null,
       h('div', { class: 'btn-row' }, [
         h('button', { class: 'btn secondary', text: 'いま同期する', onclick: async () => { await cloudSync(); toast('同期しました'); } }),
         h('button', { class: 'btn ghost', text: 'ログアウト', onclick: async () => { await signOut(); toast('ログアウトしました'); } }),

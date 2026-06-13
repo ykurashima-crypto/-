@@ -13,7 +13,15 @@ const DEFAULTS = {
   invoiceRegNo: '',  // インボイス登録番号 (T+13桁)
   bank: '',          // 振込先（銀行・支店・種別・口座番号・名義）
   logo: '',          // ロゴ画像 (dataURL, 任意)
+  planType: 'individual', // individual=個人プラン / corporate=法人プラン
 };
+
+const ONBOARDED_KEY = 'nurilog.onboarded';
+export function isOnboarded() { return localStorage.getItem(ONBOARDED_KEY) === '1'; }
+export function setOnboarded() { localStorage.setItem(ONBOARDED_KEY, '1'); }
+
+export function getPlan() { return getCompany().planType || 'individual'; }
+export function planLabel(plan = getPlan()) { return plan === 'corporate' ? '法人プラン' : '個人プラン'; }
 
 export function getCompany() {
   try { return { ...DEFAULTS, ...(JSON.parse(localStorage.getItem(KEY)) || {}) }; }
