@@ -6,36 +6,36 @@ import {
   yen, fmtDate, todayStr,
 } from '../model.js';
 import { navigate } from '../app.js';
+import { computeAlerts, moneySummary } from '../alerts.js';
 
 export function renderAdminHome() {
   const sites = store.all('sites');
   const active = activeSites();
-  const today = todayStr();
+  const { money, work } = computeAlerts();
+  const sum = moneySummary();
 
-  // 集計
-  const wonAmount = sites.filter((s) => ['won', 'work', 'done', 'billed', 'paid'].includes(s.status))
-    .reduce((a, s) => a + (s.estimateAmount || 0), 0);
-  const openLeads = sites.filter((s) => ['lead', 'survey', 'quote', 'quoted', 'follow'].includes(s.status)).length;
-  const reportCount = store.all('reports').length;
-  const photoCount = store.all('photos').length;
-
+  // お金まわりのサマリー（請求漏れ・入金待ちが一目で分かる）
   const stats = h('div', { class: 'stat-row' }, [
+    stat(yen(sum.uninvoiced), '未請求（完工済み）', sum.uninvoiced > 0 ? 'danger' : ''),
+    stat(yen(sum.awaitingPayment), '入金待ち'),
     stat(active.length, '稼働中の現場'),
-    stat(openLeads, '追客中の案件'),
-    stat(yen(wonAmount), '受注金額（累計）'),
-    stat(`${photoCount}枚 / ${reportCount}件`, '写真 / 日報'),
+    stat(money.length + work.length, '要対応', (money.length ? 'danger' : '')),
   ]);
 
-  // 要対応: 次回連絡日が今日以前のもの
-  const needFollow = sites
-    .filter((s) => s.nextContact && s.nextContact <= today && !['paid', 'done', 'billed'].includes(s.status))
-    .sort((a, b) => (a.nextContact || '').localeCompare(b.nextContact || ''));
+  // 💸 お金が漏れるぞ（最重要・赤）
+  const moneySection = h('div', {}, [
+    h('div', { class: 'section-title', text: '💸 お金が漏れるぞ' }),
+    money.length === 0
+      ? h('div', { class: 'empty', text: 'お金の漏れはありません 👍' })
+      : h('div', {}, money.map(alertCard)),
+  ]);
 
-  const followSection = h('div', {}, [
-    h('div', { class: 'section-title', text: '⏰ 要対応（次回連絡日が到来）' }),
-    needFollow.length === 0
-      ? h('div', { class: 'empty', text: '対応漏れはありません 👍' })
-      : h('div', {}, needFollow.map((s) => caseRow(s, `次回連絡: ${fmtDate(s.nextContact)}`))),
+  // 📌 やること（仕事の漏れ・中）
+  const workSection = h('div', {}, [
+    h('div', { class: 'section-title', text: '📌 やること（忘れ物チェック）' }),
+    work.length === 0
+      ? h('div', { class: 'empty', text: 'やり残しはありません 👍' })
+      : h('div', {}, work.map(alertCard)),
   ]);
 
   const todaySection = h('div', {}, [
@@ -46,15 +46,30 @@ export function renderAdminHome() {
   ]);
 
   return h('div', {}, [
-    h('h1', { class: 'page-title', text: 'ダッシュボード' }),
+    h('h1', { class: 'page-title', text: '今日やること' }),
     stats,
-    followSection,
+    moneySection,
+    workSection,
     todaySection,
   ]);
 }
 
-function stat(num, lbl) {
-  return h('div', { class: 'stat' }, [
+// アラート1件のカード。タップで該当現場へ。
+function alertCard(a) {
+  return h('div', { class: 'card tap alert-' + a.severity, onclick: () => navigate('site/' + a.siteId) }, [
+    h('div', { class: 'alert-row' }, [
+      h('span', { class: 'alert-ic', text: a.icon }),
+      h('div', {}, [
+        h('div', { class: 'alert-title', text: a.title }),
+        h('div', { class: 'sub', text: `${a.name}${a.customer ? '（' + a.customer + '）' : ''}` }),
+        h('div', { class: 'alert-detail', text: a.detail }),
+      ]),
+    ]),
+  ]);
+}
+
+function stat(num, lbl, variant = '') {
+  return h('div', { class: 'stat' + (variant ? ' ' + variant : '') }, [
     h('div', { class: 'num', text: String(num) }),
     h('div', { class: 'lbl', text: lbl }),
   ]);
@@ -139,7 +154,7 @@ export function openCaseForm(site, onDone) {
     h('div', { class: 'grid-2' }, [input('channel', '問合せ経路', 'text', 'チラシ/紹介/Web'), input('inquiryDate', '問合せ日', 'date')]),
     h('div', { class: 'grid-2' }, [input('surveyDate', '現調日', 'date'), input('estimateDate', '見積提出日', 'date')]),
     h('div', { class: 'grid-2' }, [input('estimateAmount', '見積金額', 'number', '円'), input('constructionStart', '着工予定日', 'date')]),
-    input('nextContact', '次回連絡日', 'date'),
+    h('div', { class: 'grid-2' }, [input('paymentDueDate', '入金予定日', 'date'), input('nextContact', '次回連絡日', 'date')]),
     h('div', { class: 'field' }, [h('label', { text: 'ステータス' }), statusSel]),
     h('button', {
       class: 'btn', text: editing ? '更新する' : '登録する',
@@ -149,7 +164,8 @@ export function openCaseForm(site, onDone) {
           name: f.name.value.trim(), customer: f.customer.value.trim(), phone: f.phone.value.trim(),
           manager: f.manager.value.trim(), address: f.address.value.trim(), channel: f.channel.value.trim(),
           inquiryDate: f.inquiryDate.value, surveyDate: f.surveyDate.value, estimateDate: f.estimateDate.value,
-          constructionStart: f.constructionStart.value, nextContact: f.nextContact.value, status: f.status.value,
+          constructionStart: f.constructionStart.value, paymentDueDate: f.paymentDueDate.value,
+          nextContact: f.nextContact.value, status: f.status.value,
           estimateAmount: f.estimateAmount.value ? parseInt(f.estimateAmount.value, 10) : null,
         };
         if (editing) { store.update('sites', site.id, data); toast('案件を更新しました'); }

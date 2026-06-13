@@ -105,9 +105,25 @@ export function seedIfEmpty() {
   mk('seed_suzuki', {
     name: '鈴木様邸 屋根・外壁', customer: '鈴木 美和', phone: '080-2222-3333',
     address: '川崎市麻生区上麻生5-12', status: 'quoted', manager: '佐藤',
-    channel: '紹介', inquiryDate: '2026-06-01', surveyDate: '2026-06-06',
-    estimateDate: '2026-06-09', estimateAmount: 1650000, constructionStart: '',
-    nextContact: '2026-06-16',
+    channel: '紹介', inquiryDate: '2026-05-20', surveyDate: '2026-05-28',
+    estimateDate: '2026-06-01', estimateAmount: 1650000, constructionStart: '',
+    nextContact: '2026-06-10',
+  });
+  // 完工したのに請求書がまだ＝請求漏れ（お金が漏れるぞ）
+  mk('seed_sato', {
+    name: '佐藤様邸 外壁塗装', customer: '佐藤 隆', phone: '090-5555-1212',
+    address: '横浜市戸塚区上倉田町8-2', status: 'done', manager: '佐藤',
+    channel: 'リピーター', inquiryDate: '2026-04-10', surveyDate: '2026-04-15',
+    estimateDate: '2026-04-18', estimateAmount: 980000, contractAmount: 980000,
+    constructionStart: '2026-05-12', completionDate: '2026-05-30', nextContact: '',
+  });
+  // 請求済みだが入金予定日を過ぎている＝入金漏れ（お金が漏れるぞ）
+  mk('seed_watanabe', {
+    name: '渡辺様邸 屋根塗装', customer: '渡辺 浩二', phone: '080-7777-3434',
+    address: '川崎市宮前区土橋3-4', status: 'billed', manager: '佐藤',
+    channel: 'ホームページ', inquiryDate: '2026-03-01', estimateAmount: 720000,
+    contractAmount: 720000, constructionStart: '2026-04-01', completionDate: '2026-04-20',
+    invoiceDate: '2026-04-25', paymentDueDate: '2026-05-31', nextContact: '',
   });
   mk('seed_takahashi', {
     name: '高橋アパート 共用部', customer: '高橋不動産', phone: '044-555-6677',
