@@ -90,31 +90,33 @@ export async function addPhoto({ siteId, reportId = null, phase, comment = '', f
 }
 
 // ---- 初回サンプルデータ投入 ----
+// 固定IDで投入する。これにより複数端末がそれぞれ初期化しても、共有時に
+// 同一IDとしてLWWマージされ、サンプルが重複しない。
 export function seedIfEmpty() {
-  if (store.all('sites').length > 0) return;
-  const mk = (o) => store.insert('sites', o);
-  mk({
+  if (store.allRaw('sites').length > 0) return;
+  const mk = (id, o) => store.insertWithId('sites', { id, ...o });
+  mk('seed_tanaka', {
     name: '田中様邸 外壁塗装', customer: '田中 健一', phone: '090-1234-5678',
     address: '横浜市青葉区美しが丘2-1', status: 'work', manager: '佐藤',
     channel: 'チラシ', inquiryDate: '2026-05-02', surveyDate: '2026-05-08',
     estimateDate: '2026-05-12', estimateAmount: 1280000, constructionStart: '2026-06-10',
     nextContact: '2026-06-15',
   });
-  mk({
+  mk('seed_suzuki', {
     name: '鈴木様邸 屋根・外壁', customer: '鈴木 美和', phone: '080-2222-3333',
     address: '川崎市麻生区上麻生5-12', status: 'quoted', manager: '佐藤',
     channel: '紹介', inquiryDate: '2026-06-01', surveyDate: '2026-06-06',
     estimateDate: '2026-06-09', estimateAmount: 1650000, constructionStart: '',
     nextContact: '2026-06-16',
   });
-  mk({
+  mk('seed_takahashi', {
     name: '高橋アパート 共用部', customer: '高橋不動産', phone: '044-555-6677',
     address: '川崎市多摩区登戸1-3', status: 'won', manager: '山本',
     channel: 'Web', inquiryDate: '2026-05-20', surveyDate: '2026-05-25',
     estimateDate: '2026-05-28', estimateAmount: 980000, constructionStart: '2026-06-18',
     nextContact: '2026-06-17',
   });
-  mk({
+  mk('seed_ito', {
     name: '伊藤様邸 ベランダ防水', customer: '伊藤 大輔', phone: '090-8888-9999',
     address: '横浜市港北区日吉3-7', status: 'lead', manager: '佐藤',
     channel: 'Web', inquiryDate: '2026-06-12', surveyDate: '', estimateDate: '',

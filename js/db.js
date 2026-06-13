@@ -32,28 +32,81 @@ export function uid(prefix = 'id') {
   return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 }
 
+export const SYNC_COLLECTIONS = ['sites', 'reports', 'estimates', 'photos'];
+
+// 同期通知（ローカル変更時に共有同期をトリガーするためのフック）
+let onChange = null;
+export function setChangeHandler(fn) { onChange = fn; }
+function notify() { if (onChange) onChange(); }
+
 // ---- 汎用コレクション操作 ----
+// すべてのレコードは同期用に updatedAt と deleted(トゥームストーン) を持つ。
+// 既定の all()/get() は削除済みを除外する。同期では allRaw() を使う。
 export const store = {
-  all(coll) { return data[coll].slice(); },
-  get(coll, id) { return data[coll].find((x) => x.id === id) || null; },
+  all(coll) { return data[coll].filter((x) => !x.deleted); },
+  allRaw(coll) { return data[coll].slice(); },
+  get(coll, id) {
+    const r = data[coll].find((x) => x.id === id);
+    return r && !r.deleted ? r : null;
+  },
   insert(coll, obj) {
-    const rec = { id: uid(coll), createdAt: Date.now(), ...obj };
+    const now = Date.now();
+    const rec = { id: uid(coll), createdAt: now, updatedAt: now, deleted: false, ...obj };
     data[coll].push(rec);
     persist();
+    notify();
+    return rec;
+  },
+  // 既存IDを尊重して挿入（同期で受信したレコードをローカル生成する場合などに使用）
+  insertWithId(coll, obj) {
+    const now = Date.now();
+    const rec = { createdAt: now, updatedAt: now, deleted: false, ...obj };
+    data[coll].push(rec);
+    persist();
+    notify();
     return rec;
   },
   update(coll, id, patch) {
     const rec = data[coll].find((x) => x.id === id);
     if (!rec) return null;
-    Object.assign(rec, patch);
+    Object.assign(rec, patch, { updatedAt: Date.now() });
     persist();
+    notify();
     return rec;
   },
+  // 論理削除（トゥームストーン）。削除を他端末へ伝播させる。
   remove(coll, id) {
-    data[coll] = data[coll].filter((x) => x.id !== id);
-    persist();
+    const rec = data[coll].find((x) => x.id === id);
+    if (rec) { rec.deleted = true; rec.updatedAt = Date.now(); persist(); notify(); }
   },
-  replaceAll(next) { data = { ...structuredClone(defaultData), ...next }; persist(); },
+  // 同期: since より後に更新されたレコード（削除済み含む）
+  changedSince(since) {
+    const out = {};
+    for (const coll of SYNC_COLLECTIONS) {
+      out[coll] = data[coll].filter((x) => (x.updatedAt || 0) > since);
+    }
+    return out;
+  },
+  // 同期: サーバー由来レコードをLWWでマージ。新規取得した未取得画像IDを返す。
+  mergeIncoming(incoming) {
+    const newPhotoIds = [];
+    for (const coll of SYNC_COLLECTIONS) {
+      for (const inc of incoming[coll] || []) {
+        const idx = data[coll].findIndex((x) => x.id === inc.id);
+        if (idx === -1) {
+          data[coll].push(inc);
+          if (coll === 'photos' && !inc.deleted) newPhotoIds.push(inc.id);
+        } else if ((inc.updatedAt || 0) > (data[coll][idx].updatedAt || 0)) {
+          const wasMissing = coll === 'photos' && data[coll][idx].deleted;
+          data[coll][idx] = inc;
+          if (coll === 'photos' && !inc.deleted && wasMissing) newPhotoIds.push(inc.id);
+        }
+      }
+    }
+    persist();
+    return newPhotoIds;
+  },
+  replaceAll(next) { data = { ...structuredClone(defaultData), ...next }; persist(); notify(); },
   raw() { return data; },
 };
 

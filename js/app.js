@@ -6,6 +6,8 @@ import { renderWorkerHome } from './views/worker.js';
 import { renderAdminHome, renderCases } from './views/admin.js';
 import { renderSite, renderReportForm, renderPhotoCapture } from './views/site.js';
 import { renderEstimate } from './views/estimate.js';
+import { renderSettings } from './views/settings.js';
+import { initSync, onSyncEvent, syncState, syncNow } from './sync.js';
 
 const ROLE_KEY = 'nurilog.role';
 
@@ -14,11 +16,13 @@ const tabsByRole = {
     { route: 'worker', icon: '🏠', label: 'ホーム' },
     { route: 'photo',  icon: '📷', label: '写真' },
     { route: 'report', icon: '📝', label: '日報' },
+    { route: 'settings', icon: '🔗', label: '共有' },
   ],
   admin: [
     { route: 'admin',    icon: '📊', label: 'ダッシュ' },
     { route: 'cases',    icon: '📋', label: '案件' },
     { route: 'estimate', icon: '🧮', label: '見積' },
+    { route: 'settings', icon: '🔗', label: '共有' },
   ],
 };
 
@@ -33,6 +37,7 @@ const routes = {
   admin: () => renderAdminHome(),
   cases: () => renderCases(),
   estimate: (id) => renderEstimate(id),
+  settings: () => renderSettings(),
   site: (id) => renderSite(id),
 };
 
@@ -87,9 +92,30 @@ function setupRoleSwitch() {
   sync();
 }
 
+// 同期で他端末の変更が入ったら、閲覧系の画面だけ再描画（入力中フォームは触らない）
+const REFRESH_ROUTES = ['worker', 'admin', 'cases', 'site'];
+function onSynced() {
+  const { route } = parseHash();
+  if (REFRESH_ROUTES.includes(route)) render();
+}
+
+function updateSyncBadge() {
+  const el = document.getElementById('syncBadge');
+  if (!el) return;
+  const s = syncState();
+  if (!s.enabled) { el.hidden = true; return; }
+  el.hidden = false;
+  el.className = 'sync-badge ' + (s.lastError ? 'err' : s.syncing ? 'busy' : 'on');
+  el.textContent = s.lastError ? '同期エラー' : s.syncing ? '同期中…' : '共有中';
+}
+
 function boot() {
   seedIfEmpty();
   setupRoleSwitch();
+  initSync();
+  onSyncEvent(updateSyncBadge);
+  updateSyncBadge();
+  document.addEventListener('nurilog:synced', onSynced);
   window.addEventListener('hashchange', render);
   if (!location.hash) navigate(getRole() === 'admin' ? 'admin' : 'worker');
   render();
@@ -100,6 +126,7 @@ function boot() {
   }
 }
 
-// store をデバッグ用に公開
+// デバッグ用に公開
 window.__nurilog = store;
+window.__syncNow = syncNow;
 boot();

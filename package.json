@@ -1,0 +1,14 @@
+{
+  "name": "nurilog",
+  "version": "0.2.0",
+  "private": true,
+  "description": "塗装業の現場写真・日報・案件管理・見積アプリ（共有サーバー同梱）",
+  "type": "module",
+  "scripts": {
+    "start": "node server/server.js",
+    "serve": "node server/server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

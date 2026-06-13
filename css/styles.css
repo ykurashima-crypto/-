@@ -40,6 +40,14 @@ body {
 .brand { display: flex; align-items: center; gap: 8px; }
 .brand-logo { width: 28px; height: 28px; }
 .brand-name { font-weight: 700; font-size: 18px; letter-spacing: .02em; }
+.sync-badge {
+  font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px;
+  background: var(--surface-2); color: var(--muted); white-space: nowrap;
+}
+.sync-badge.on { background: #e3f6ec; color: #117a44; }
+.sync-badge.busy { background: #eef3ff; color: #2f5fd0; }
+.sync-badge.err { background: #fdeef0; color: #c0334b; }
+
 .role-switch { display: flex; background: var(--surface-2); border-radius: 999px; padding: 3px; }
 .role-switch button {
   border: 0; background: transparent; color: var(--muted);

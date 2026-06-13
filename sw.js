@@ -1,5 +1,5 @@
 // シンプルなオフラインキャッシュ。アプリ資産をキャッシュし、ネット不通でも起動できるようにする。
-const CACHE = 'nurilog-v1';
+const CACHE = 'nurilog-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -10,10 +10,12 @@ const ASSETS = [
   './js/db.js',
   './js/model.js',
   './js/ui.js',
+  './js/sync.js',
   './js/views/worker.js',
   './js/views/admin.js',
   './js/views/site.js',
   './js/views/estimate.js',
+  './js/views/settings.js',
 ];
 
 self.addEventListener('install', (e) => {
