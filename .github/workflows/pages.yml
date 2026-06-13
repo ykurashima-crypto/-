@@ -1,10 +1,11 @@
 name: Deploy to GitHub Pages
 
-# 静的フロント(PWA)をGitHub Pagesへ自動デプロイする。
-# configure-pages の enablement:true により、Settings操作なしでPagesを有効化する。
+# 静的フロント(PWA)をGitHub Pagesへデプロイする。
+# 注意: Pagesの「初回有効化」はActionsのGITHUB_TOKENでは実行できない
+# (Resource not accessible by integration)。先に Settings → Pages →
+# Source = "GitHub Actions" を一度だけ選んでから、このワークフローを実行すること。
+# それ以降は手動実行(workflow_dispatch)でデプロイできる。
 on:
-  push:
-    branches: ["claude/eager-pasteur-l55tr3"]
   workflow_dispatch:
 
 permissions:

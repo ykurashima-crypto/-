@@ -39,23 +39,32 @@ python3 -m http.server 8099
 スマホでは「ホーム画面に追加」でアプリのように起動できます（オフライン動作）。
 画面右上で「職人 / 管理者」を切り替えます。初回はサンプル案件が自動投入されます。
 
-### オンライン体験版（GitHub Pages）
+### オンライン体験版（設定不要・すぐ開ける）
 
-静的フロントだけを GitHub Pages で公開すると、インストール不要でブラウザからすぐ試せます
-（サーバーレスのため**データは各自の端末内に保存**される体験版。共有機能を使う場合のみ
-「共有」タブで外部サーバーURLを指定します）。
+公開リポジトリのファイルを正しいMIMEで配信するCDN（githack）経由で、**有効化やビルド設定なしに
+ブラウザからすぐ開けます**（サーバーレスのため**データは各自の端末内に保存**される体験版。
+共有機能を使う場合のみ「共有」タブで外部サーバーURLを指定します）。
 
-公開手順（リポジトリ管理者が1回だけ設定）:
+**体験版URL（最新ブランチを配信）:**
 
-1. GitHub のリポジトリ → **Settings** → 左メニュー **Pages**
-2. **Build and deployment** → Source = **Deploy from a branch**
-3. Branch = **`claude/eager-pasteur-l55tr3`** ／ フォルダ = **`/ (root)`** → **Save**
-4. 1〜2分待つと、次のURLで公開されます:
+```
+https://raw.githack.com/ykurashima-crypto/-/claude/eager-pasteur-l55tr3/index.html
+```
 
-   **https://ykurashima-crypto.github.io/-/**
+PC・スマホのブラウザでそのまま開けます。職人/管理者の切替、写真・日報・案件・見積まで操作可能です。
 
-> 相対パス構成のためサブパス配信でそのまま動作します（実機検証済み）。
-> `.nojekyll` を同梱しているので `js/` などもそのまま配信されます。
+> 全アセットが公開取得できることを確認済み。相対パス構成のためCDNのサブパス配信でも動作します。
+
+### durable に自前ホストする場合（GitHub Pages）
+
+GitHub Pages で配信したい場合は、**初回のみ**リポジトリ設定が必要です
+（Pagesサイトの新規作成はActionsのトークンでは行えないため）:
+
+1. リポジトリ → **Settings** → **Pages**
+2. **Build and deployment** → Source = **GitHub Actions**（または **Deploy from a branch** → `claude/eager-pasteur-l55tr3` / root）
+3. 同梱の `.github/workflows/pages.yml` を Actions タブから手動実行（GitHub Actions を選んだ場合）
+
+公開URL: `https://ykurashima-crypto.github.io/-/`
 
 ### 複数人・複数端末で共有する（同梱サーバー）
 
