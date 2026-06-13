@@ -1,9 +1,9 @@
 // 職人向け「予定」ビュー: 次にどの現場へ行くか、今の現場の工期・作業時間・
 // 作業フェーズ（工程順）、納期に対して前倒し/遅れかをひと目で。金額は一切表示しない。
-import { h } from '../ui.js';
+import { h, gauge } from '../ui.js';
 import { activeSites, fmtDate } from '../model.js';
 import { navigate } from '../app.js';
-import { siteProcesses, plannedPeriod, scheduleStatus, upcomingSteps, currentStep } from './process.js';
+import { siteProcesses, plannedPeriod, scheduleStatus, upcomingSteps, currentStep, processProgress } from './process.js';
 
 export function renderSchedule() {
   const sites = activeSites();
@@ -71,6 +71,7 @@ function siteScheduleCard(s) {
     h('div', { class: 'sub', text: `📍 ${s.address || '住所未登録'}` }),
     h('div', { class: 'sub', text: `🕒 ${time}　🗓 工期 ${fmtDate(period.start)}〜${fmtDate(period.end)}` }),
     cur ? h('div', { class: 'sub', text: `▶ いまの工程: ${cur.processType}（予定 ${fmtDate(cur.scheduledDate)}）` }) : null,
+    (() => { const p = processProgress(s.id); return p ? gauge(p.done, p.total) : null; })(),
     phases,
   ]);
 }

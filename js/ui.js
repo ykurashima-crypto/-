@@ -24,6 +24,18 @@ export function h(tag, attrs = {}, children = []) {
 
 export function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
 
+// 戦況ゲージ（工程の進捗バー）。done/total から割合を描く。
+export function gauge(done, total, label = '戦況') {
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  return h('div', { class: 'gauge' }, [
+    h('div', { class: 'gauge-top' }, [
+      h('span', { text: label }),
+      h('span', { text: `${done}/${total}　${pct}%` }),
+    ]),
+    h('div', { class: 'gauge-track' }, [h('div', { class: 'gauge-fill', style: `width:${pct}%` })]),
+  ]);
+}
+
 let toastTimer = null;
 export function toast(msg) {
   let t = document.querySelector('.toast');
