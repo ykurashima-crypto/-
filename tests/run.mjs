@@ -34,6 +34,7 @@ const { computeAlerts, moneySummary } = await import(J('js/alerts.js'));
 const { addDays, billableAmount } = await import(J('js/money.js'));
 const { getPlan, planLabel, isOnboarded, setOnboarded, setCompany } = await import(J('js/company.js'));
 const { openEstimateDoc, openInvoiceDoc } = await import(J('js/doc.js'));
+const { caseEvents } = await import(J('js/views/calendar.js'));
 const reset = () => store.replaceAll({});
 
 group('db / ID');
@@ -50,6 +51,23 @@ test('論理削除はトゥームストーンを残す', () => {
   store.remove('customers', r.id);
   assert.equal(store.get('customers', r.id), null);
   assert.equal(store.allRaw('customers').find((x) => x.id === r.id).deleted, true);
+});
+
+group('案件管理 / カレンダー');
+test('最小項目で新規案件を登録できる', () => {
+  reset();
+  const r = store.insert('sites', { name: '田中様邸 外壁塗装', customer: '田中', status: 'lead' });
+  assert.equal(store.get('sites', r.id).name, '田中様邸 外壁塗装');
+  assert.equal(store.all('sites').length, 1);
+});
+test('カレンダーは案件の日付からイベントを抽出', () => {
+  reset();
+  store.insert('sites', { name: 'A', surveyDate: '2026-07-03', constructionStart: '2026-07-10', paymentDueDate: '2026-07-31' });
+  const evs = caseEvents();
+  assert.equal(evs.length, 3);
+  assert.ok(evs.some((e) => e.label === '現調' && e.date === '2026-07-03'));
+  assert.ok(evs.some((e) => e.label === '着工' && e.date === '2026-07-10'));
+  assert.ok(evs.some((e) => e.label === '入金予定' && e.date === '2026-07-31'));
 });
 
 group('お金が漏れるぞ アラート');

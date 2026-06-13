@@ -42,7 +42,7 @@ const MAP = {
     surveyDate: 'survey_date', estimateDate: 'estimate_date', estimateAmount: 'estimate_amount',
     contractAmount: 'contract_amount', constructionStart: 'construction_start',
     completionDate: 'completion_date', invoiceDate: 'invoice_date', paymentDueDate: 'payment_due_date',
-    paymentDate: 'payment_date', paymentStatus: 'payment_status', nextContact: 'next_contact' },
+    paymentDate: 'payment_date', paymentStatus: 'payment_status', nextContact: 'next_contact', memo: 'memo' },
   customers: { name: 'name', phone: 'phone', address: 'address', channel: 'channel',
     inquiryDate: 'inquiry_date', email: 'email', postalCode: 'postal_code',
     customerType: 'customer_type', memo: 'note' },

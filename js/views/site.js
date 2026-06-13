@@ -50,6 +50,7 @@ export function renderSite(siteId) {
     ['問合せ日', fmtDate(s.inquiryDate)], ['現調', fmtDate(s.surveyDate)],
     ['見積提出', fmtDate(s.estimateDate)], ['見積金額', s.estimateAmount ? yen(s.estimateAmount) : '—'],
     ['着工予定', fmtDate(s.constructionStart)], ['次回連絡', fmtDate(s.nextContact)],
+    ['メモ', s.memo],
   ];
   const infoCard = h('div', { class: 'card' }, infoRows.map(([k, v]) =>
     h('div', { class: 'kv' }, [h('span', { class: 'k', text: k }), h('span', { class: 'v', text: v || '—' })])));
@@ -61,15 +62,14 @@ export function renderSite(siteId) {
       ])
     : h('span', { class: 'pill ' + si.cls, text: si.label });
 
-  // 連絡導線（電話発信・地図）。職人も使うので役割を問わず表示。
-  const contactRow = (s.phone || s.address)
+  // 住所から地図を開く（電話発信ボタンは廃止）。
+  const contactRow = s.address
     ? h('div', { class: 'btn-row' }, [
-        s.phone ? h('a', { class: 'btn secondary', href: 'tel:' + s.phone, text: '📞 電話する' }) : null,
-        s.address ? h('a', {
+        h('a', {
           class: 'btn secondary', target: '_blank', rel: 'noopener',
           href: 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(s.address),
           text: '🗺 地図を開く',
-        }) : null,
+        }),
       ])
     : null;
 

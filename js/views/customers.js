@@ -78,14 +78,13 @@ export function renderCustomer(id) {
   if (!c) return h('div', { class: 'empty', text: '顧客が見つかりません' });
   const sites = customerSites(c);
 
-  const contactRow = (c.phone || c.address)
+  const contactRow = c.address
     ? h('div', { class: 'btn-row' }, [
-        c.phone ? h('a', { class: 'btn secondary', href: 'tel:' + c.phone, text: '📞 電話する' }) : null,
-        c.address ? h('a', {
+        h('a', {
           class: 'btn secondary', target: '_blank', rel: 'noopener',
           href: 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(c.address),
           text: '🗺 地図を開く',
-        }) : null,
+        }),
       ])
     : null;
 

@@ -21,7 +21,7 @@
 | route | 画面 | ファイル |
 |---|---|---|
 | `admin` | ダッシュボード（💸お金が漏れるぞ＋ワンタップ解決、今日の現場） | `views/admin.js` |
-| `cases` | 案件一覧（ステータス絞り込み・新規） | `views/admin.js` |
+| `cases` | 案件（一覧/カレンダー切替・ステータス絞り込み・最小項目で新規登録） | `views/admin.js` + `views/calendar.js` |
 | `customers` | 顧客一覧/検索/仮登録 | `views/customers.js` |
 | `customer` | 顧客詳細（案件履歴・電話/地図・この顧客で新規案件） | `views/customers.js` |
 | `site` | 案件詳細（電話/地図・お金操作・現地調査・工程・写真・日報・書類PDF） | `views/site.js` |

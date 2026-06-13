@@ -189,6 +189,31 @@ body {
 .alert-actions { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 .alert-actions .btn-row { margin-top: 0; }
 
+/* 案件カレンダー */
+.cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.cal-head .btn.sm { width: 44px; }
+.cal-title { font-size: 18px; font-weight: 800; }
+.cal-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; font-size: 12px; color: var(--muted); }
+.cal-leg { display: inline-flex; align-items: center; gap: 4px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.cal-dow { text-align: center; font-size: 12px; color: var(--muted); padding: 4px 0; }
+.cal-dow.sun { color: #c0334b; } .cal-dow.sat { color: #2f5fd0; }
+.cal-cell { min-height: 46px; border: 1px solid var(--line); border-radius: 8px; padding: 3px; background: var(--surface); }
+.cal-cell.empty { border: 0; background: transparent; }
+.cal-cell.today { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
+.cal-d { font-size: 12px; font-weight: 700; }
+.cal-dots { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 2px; }
+.cal-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--muted); }
+.cal-dot.ev-survey { background: #b67900; }
+.cal-dot.ev-quote { background: #c06a12; }
+.cal-dot.ev-start { background: #1862c0; }
+.cal-dot.ev-done { background: #1a9e57; }
+.cal-dot.ev-pay { background: #c0334b; }
+.cal-evrow { display: flex; align-items: center; gap: 8px; }
+.cal-ev-date { font-weight: 700; min-width: 48px; }
+.cal-ev-label { font-size: 12px; color: var(--muted); min-width: 56px; }
+.cal-ev-name { flex: 1; }
+
 /* オンボーディングのプラン選択 */
 .onboard { max-width: 480px; margin: 4vh auto 0; }
 .plan-pick { display: grid; gap: 10px; }
