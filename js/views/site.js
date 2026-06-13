@@ -8,6 +8,7 @@ import {
 } from '../model.js';
 import { navigate } from '../app.js';
 import { openCaseForm } from './admin.js';
+import { markInvoiced, markPaid } from '../money.js';
 
 // ---------- 現場詳細 ----------
 export function renderSite(siteId) {
@@ -57,6 +58,21 @@ export function renderSite(siteId) {
       ])
     : h('span', { class: 'pill ' + si.cls, text: si.label });
 
+  // 連絡導線（電話発信・地図）。職人も使うので役割を問わず表示。
+  const contactRow = (s.phone || s.address)
+    ? h('div', { class: 'btn-row' }, [
+        s.phone ? h('a', { class: 'btn secondary', href: 'tel:' + s.phone, text: '📞 電話する' }) : null,
+        s.address ? h('a', {
+          class: 'btn secondary', target: '_blank', rel: 'noopener',
+          href: 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(s.address),
+          text: '🗺 地図を開く',
+        }) : null,
+      ])
+    : null;
+
+  // お金まわりのワンタップ操作（管理者のみ）。完工→請求→入金を現場画面からも記録できる。
+  const moneyActions = isAdmin ? moneyActionBlock(s) : null;
+
   const estimateBtn = isAdmin
     ? h('button', { class: 'btn secondary', text: '🧮 この現場の見積を作る', onclick: () => navigate('estimate/' + s.id) })
     : null;
@@ -81,10 +97,12 @@ export function renderSite(siteId) {
     h('button', { class: 'btn ghost sm', text: '← 戻る', onclick: () => history.back() }),
     h('h1', { class: 'page-title', text: s.name }),
     statusControl,
+    contactRow,
     h('div', { class: 'btn-row' }, [
       h('button', { class: 'btn', text: '📷 写真を追加', onclick: () => navigate('photo/' + s.id) }),
       h('button', { class: 'btn secondary', text: '📝 日報', onclick: () => navigate('report/' + s.id) }),
     ]),
+    moneyActions,
     photoSection,
     reportSection,
     h('div', { class: 'section-title', text: '案件情報' }),
@@ -92,6 +110,30 @@ export function renderSite(siteId) {
     estimateBtn,
     adminActions,
   ]);
+}
+
+// 完工→請求→入金の進み具合に応じたワンタップ操作カード。
+function moneyActionBlock(s) {
+  const refresh = () => navigate('site/' + s.id);
+  if (s.status === 'done') {
+    return h('div', { class: 'card alert-money' }, [
+      h('div', { class: 'alert-title', text: '🧾 まだ請求していません' }),
+      h('div', { class: 'alert-detail', text: '完工済みです。請求書を作ってお金を回収しましょう。' }),
+      h('button', { class: 'btn sm', style: 'margin-top:8px', text: '請求書を作った', onclick: () => markInvoiced(s, refresh) }),
+    ]);
+  }
+  if (s.status === 'billed') {
+    const overdue = s.paymentDueDate && s.paymentDueDate < todayStr();
+    return h('div', { class: 'card ' + (overdue ? 'alert-money' : '') }, [
+      h('div', { class: 'alert-title', text: overdue ? '⏰ 入金予定日を過ぎています' : '💰 入金待ち' }),
+      h('div', { class: 'alert-detail', text: s.paymentDueDate ? `入金予定日: ${s.paymentDueDate}` : '入金予定日が未設定です' }),
+      h('button', { class: 'btn sm', style: 'margin-top:8px', text: '入金を確認した', onclick: () => markPaid(s, refresh) }),
+    ]);
+  }
+  if (s.status === 'paid') {
+    return h('div', { class: 'warn-box ok', text: `✅ 入金済み${s.paymentDate ? '（' + s.paymentDate + '）' : ''}` });
+  }
+  return null;
 }
 
 function statusSelect(current, onchange) {

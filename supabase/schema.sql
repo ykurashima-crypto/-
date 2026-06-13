@@ -53,7 +53,13 @@ create table if not exists public.sites (
   survey_date         date,
   estimate_date       date,
   estimate_amount     bigint,
+  contract_amount     bigint,
   construction_start  date,
+  completion_date     date,
+  invoice_date        date,
+  payment_due_date    date,
+  payment_date        date,
+  payment_status      text,
   next_contact        date,
   deleted             boolean not null default false,
   created_by          uuid default auth.uid(),
@@ -105,6 +111,14 @@ create table if not exists public.photos (
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
 );
+
+-- 既存DBへの後方互換マイグレーション（請求・入金まわりの列を後から追加しても安全）
+alter table public.sites add column if not exists contract_amount  bigint;
+alter table public.sites add column if not exists completion_date  date;
+alter table public.sites add column if not exists invoice_date     date;
+alter table public.sites add column if not exists payment_due_date date;
+alter table public.sites add column if not exists payment_date     date;
+alter table public.sites add column if not exists payment_status   text;
 
 create index if not exists idx_sites_company     on public.sites(company_id, updated_at);
 create index if not exists idx_reports_company   on public.reports(company_id, updated_at);

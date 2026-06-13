@@ -1,15 +1,23 @@
 // 管理者ビュー: ダッシュボード（今日の現場・進捗集計）と案件一覧。
 import { store } from '../db.js';
-import { h, toast, openModal } from '../ui.js';
+import { h, toast, openModal, clear } from '../ui.js';
 import {
   STATUSES, statusInfo, activeSites, sitePhotos, siteReports,
   yen, fmtDate, todayStr,
 } from '../model.js';
 import { navigate } from '../app.js';
 import { computeAlerts, moneySummary } from '../alerts.js';
+import { markInvoiced, markPaid } from '../money.js';
 
 export function renderAdminHome() {
-  const sites = store.all('sites');
+  // 請求・入金などの操作後に、ホームをその場で作り直して数字とアラートを最新化する。
+  const wrap = h('div', {});
+  const rerender = () => { clear(wrap); buildHome(wrap, rerender); };
+  rerender();
+  return wrap;
+}
+
+function buildHome(wrap, rerender) {
   const active = activeSites();
   const { money, work } = computeAlerts();
   const sum = moneySummary();
@@ -27,7 +35,7 @@ export function renderAdminHome() {
     h('div', { class: 'section-title', text: '💸 お金が漏れるぞ' }),
     money.length === 0
       ? h('div', { class: 'empty', text: 'お金の漏れはありません 👍' })
-      : h('div', {}, money.map(alertCard)),
+      : h('div', {}, money.map((a) => alertCard(a, rerender))),
   ]);
 
   // 📌 やること（仕事の漏れ・中）
@@ -35,7 +43,7 @@ export function renderAdminHome() {
     h('div', { class: 'section-title', text: '📌 やること（忘れ物チェック）' }),
     work.length === 0
       ? h('div', { class: 'empty', text: 'やり残しはありません 👍' })
-      : h('div', {}, work.map(alertCard)),
+      : h('div', {}, work.map((a) => alertCard(a, rerender))),
   ]);
 
   const todaySection = h('div', {}, [
@@ -45,19 +53,20 @@ export function renderAdminHome() {
       : h('div', {}, active.map((s) => caseRow(s, `写真 ${sitePhotos(s.id).length}・日報 ${siteReports(s.id).length}`))),
   ]);
 
-  return h('div', {}, [
+  wrap.append(
     h('h1', { class: 'page-title', text: '今日やること' }),
     stats,
     moneySection,
     workSection,
     todaySection,
-  ]);
+  );
 }
 
-// アラート1件のカード。タップで該当現場へ。
-function alertCard(a) {
-  return h('div', { class: 'card tap alert-' + a.severity, onclick: () => navigate('site/' + a.siteId) }, [
-    h('div', { class: 'alert-row' }, [
+// アラート1件のカード。本文タップで現場へ。種別に応じてワンタップ解決ボタンを出す。
+function alertCard(a, onResolved) {
+  const action = alertAction(a, onResolved);
+  return h('div', { class: 'card alert-' + a.severity }, [
+    h('div', { class: 'alert-row tap', onclick: () => navigate('site/' + a.siteId) }, [
       h('span', { class: 'alert-ic', text: a.icon }),
       h('div', {}, [
         h('div', { class: 'alert-title', text: a.title }),
@@ -65,7 +74,33 @@ function alertCard(a) {
         h('div', { class: 'alert-detail', text: a.detail }),
       ]),
     ]),
+    action ? h('div', { class: 'alert-actions' }, [action]) : null,
   ]);
+}
+
+// アラート種別ごとの解決ボタン（その場で記録 → ホーム再描画）。
+function alertAction(a, onResolved) {
+  const site = () => store.get('sites', a.siteId);
+  if (a.action === 'invoice') {
+    return h('button', { class: 'btn sm', text: '🧾 請求書を作った', onclick: () => markInvoiced(site(), onResolved) });
+  }
+  if (a.action === 'payment') {
+    return h('button', { class: 'btn sm', text: '💰 入金を確認した', onclick: () => markPaid(site(), onResolved) });
+  }
+  if (a.action === 'estimate') {
+    return h('button', { class: 'btn sm secondary', text: '🧮 見積を作る', onclick: () => navigate('estimate/' + a.siteId) });
+  }
+  if (a.action === 'call' && a.phone) {
+    // 電話発信は<a tel:>で。発信後の追客忘れ防止に「明日また連絡」も置く。
+    return h('div', { class: 'btn-row' }, [
+      h('a', { class: 'btn sm', href: 'tel:' + a.phone, text: '📞 電話する' }),
+      h('button', {
+        class: 'btn sm secondary', text: '✔ 連絡済み',
+        onclick: () => { store.update('sites', a.siteId, { nextContact: '' }); toast('連絡済みにしました'); onResolved && onResolved(); },
+      }),
+    ]);
+  }
+  return null;
 }
 
 function stat(num, lbl, variant = '') {
@@ -153,8 +188,10 @@ export function openCaseForm(site, onDone) {
     input('address', '住所', 'text', '市区町村〜番地'),
     h('div', { class: 'grid-2' }, [input('channel', '問合せ経路', 'text', 'チラシ/紹介/Web'), input('inquiryDate', '問合せ日', 'date')]),
     h('div', { class: 'grid-2' }, [input('surveyDate', '現調日', 'date'), input('estimateDate', '見積提出日', 'date')]),
-    h('div', { class: 'grid-2' }, [input('estimateAmount', '見積金額', 'number', '円'), input('constructionStart', '着工予定日', 'date')]),
-    h('div', { class: 'grid-2' }, [input('paymentDueDate', '入金予定日', 'date'), input('nextContact', '次回連絡日', 'date')]),
+    h('div', { class: 'grid-2' }, [input('estimateAmount', '見積金額', 'number', '円'), input('contractAmount', '契約金額', 'number', '円')]),
+    h('div', { class: 'grid-2' }, [input('constructionStart', '着工予定日', 'date'), input('completionDate', '完工日', 'date')]),
+    h('div', { class: 'grid-2' }, [input('invoiceDate', '請求日', 'date'), input('paymentDueDate', '入金予定日', 'date')]),
+    h('div', { class: 'grid-2' }, [input('paymentDate', '入金日', 'date'), input('nextContact', '次回連絡日', 'date')]),
     h('div', { class: 'field' }, [h('label', { text: 'ステータス' }), statusSel]),
     h('button', {
       class: 'btn', text: editing ? '更新する' : '登録する',
@@ -164,9 +201,11 @@ export function openCaseForm(site, onDone) {
           name: f.name.value.trim(), customer: f.customer.value.trim(), phone: f.phone.value.trim(),
           manager: f.manager.value.trim(), address: f.address.value.trim(), channel: f.channel.value.trim(),
           inquiryDate: f.inquiryDate.value, surveyDate: f.surveyDate.value, estimateDate: f.estimateDate.value,
-          constructionStart: f.constructionStart.value, paymentDueDate: f.paymentDueDate.value,
+          constructionStart: f.constructionStart.value, completionDate: f.completionDate.value,
+          invoiceDate: f.invoiceDate.value, paymentDueDate: f.paymentDueDate.value, paymentDate: f.paymentDate.value,
           nextContact: f.nextContact.value, status: f.status.value,
           estimateAmount: f.estimateAmount.value ? parseInt(f.estimateAmount.value, 10) : null,
+          contractAmount: f.contractAmount.value ? parseInt(f.contractAmount.value, 10) : null,
         };
         if (editing) { store.update('sites', site.id, data); toast('案件を更新しました'); }
         else { store.insert('sites', data); toast('案件を登録しました'); }

@@ -13,8 +13,13 @@ function daysSince(dateStr, now) {
   return Math.floor((now - Date.parse(dateStr + 'T00:00:00')) / DAY);
 }
 
-function item(site, severity, icon, title, detail) {
-  return { siteId: site.id, name: site.name, customer: site.customer || '', severity, icon, title, detail };
+// action: ダッシュボードでワンタップ解決させるための種別
+//   'invoice'=請求した / 'payment'=入金された / 'call'=電話 / 'estimate'=見積を作る
+function item(site, severity, icon, title, detail, action = null) {
+  return {
+    siteId: site.id, name: site.name, customer: site.customer || '',
+    phone: site.phone || '', severity, icon, title, detail, action,
+  };
 }
 
 // 案件から漏れ候補を算出。money=お金の漏れ(高), work=仕事の漏れ(中)
@@ -32,19 +37,19 @@ export function computeAlerts(now = Date.now()) {
     // ── お金の漏れ ──────────────────────────
     // 完工したのに請求書がまだ（請求漏れ＝最重要）
     if (s.status === 'done') {
-      money.push(item(s, 'money', '🧾', '完工したのに請求書がまだ', '請求しないと入金されません。請求書を作りましょう'));
+      money.push(item(s, 'money', '🧾', '完工したのに請求書がまだ', '請求しないと入金されません。請求書を作りましょう', 'invoice'));
     }
     // 入金予定日を過ぎている（入金漏れ）
     if (s.status === 'billed' && s.paymentDueDate && s.paymentDueDate < today) {
-      money.push(item(s, 'money', '⏰', `入金予定日（${s.paymentDueDate}）を過ぎています`, '入金を確認し、未入金なら督促を'));
+      money.push(item(s, 'money', '⏰', `入金予定日（${s.paymentDueDate}）を過ぎています`, '入金を確認し、未入金なら督促を', 'payment'));
     }
     // 見積を出したのに返事がない（受注漏れ）
     if (s.status === 'quoted' && s.estimateDate && daysSince(s.estimateDate, now) >= QUOTE_FOLLOWUP_DAYS) {
-      money.push(item(s, 'money', '📨', `見積提出から${daysSince(s.estimateDate, now)}日 返事なし`, '追客の連絡をしないと失注します'));
+      money.push(item(s, 'money', '📨', `見積提出から${daysSince(s.estimateDate, now)}日 返事なし`, '追客の連絡をしないと失注します', 'call'));
     }
     // 見積がまだ作られていない（入口の漏れ）
     if (['survey', 'quote'].includes(s.status) && !hasEstimate) {
-      money.push(item(s, 'money', '💸', '見積がまだ', '受注の入口です。早めに見積を作りましょう'));
+      money.push(item(s, 'money', '💸', '見積がまだ', '受注の入口です。早めに見積を作りましょう', 'estimate'));
     }
 
     // ── 仕事の漏れ ──────────────────────────

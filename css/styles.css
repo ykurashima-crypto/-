@@ -185,6 +185,9 @@ body {
 .card.alert-money { border-left: 5px solid var(--red); background: #fdf4f4; }
 .card.alert-money .alert-title { color: #b32338; }
 .card.alert-work { border-left: 5px solid var(--amber); }
+.alert-row.tap { cursor: pointer; }
+.alert-actions { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.alert-actions .btn-row { margin-top: 0; }
 
 /* Warning box (estimate) */
 .warn-box { border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; font-size: 14px; }
