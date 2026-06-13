@@ -180,13 +180,15 @@ function documentBlock(s) {
     .sort((a, b) => b.createdAt - a.createdAt)[0] || null;
   const canEstimate = !!(latestEst || s.estimateAmount);
   const canInvoice = !!(s.contractAmount || s.estimateAmount) && ['done', 'billed', 'paid'].includes(s.status);
-  if (!canEstimate && !canInvoice) return null;
+  const hasPhotos = sitePhotos(s.id).length > 0;
+  if (!canEstimate && !canInvoice && !hasPhotos) return null;
   return h('div', {}, [
     h('div', { class: 'section-title', text: '書類（PDF）' }),
     h('div', { class: 'btn-row' }, [
       canEstimate ? h('button', { class: 'btn secondary', text: '📄 見積書', onclick: () => openEstimateDoc(s, latestEst) }) : null,
       canInvoice ? h('button', { class: 'btn secondary', text: '📄 請求書', onclick: () => openInvoiceDoc(s) }) : null,
     ]),
+    hasPhotos ? h('button', { class: 'btn secondary', style: 'margin-top:8px', text: '📷 写真報告書をつくる', onclick: () => navigate('photodoc/' + s.id) }) : null,
   ]);
 }
 
@@ -293,14 +295,14 @@ export function renderPhotoCapture(siteId) {
   if (!s) return h('div', { class: 'empty', text: '現場が見つかりません' });
 
   let phase = 'before';
-  const phaseBtns = h('div', { class: 'role-switch', style: 'width:100%' },
+  const phaseBtns = h('div', { class: 'chip-wrap' },
     PHASES.map((p) => h('button', {
-      class: p.key === phase ? 'active' : '',
+      class: 'chip' + (p.key === phase ? ' on' : ''),
       text: p.label,
       onclick: (e) => {
         phase = p.key;
-        phaseBtns.querySelectorAll('button').forEach((b) => b.classList.remove('active'));
-        e.target.classList.add('active');
+        phaseBtns.querySelectorAll('button').forEach((b) => b.classList.remove('on'));
+        e.target.classList.add('on');
       },
     })));
 

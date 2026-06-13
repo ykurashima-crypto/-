@@ -2,6 +2,8 @@
 // 依存ライブラリ・ビルド不要。ブラウザの印刷機能で「PDFとして保存」できる。
 // 日本語はシステムフォントで描画されるため文字化けしない。
 import { getCompany } from './company.js';
+import { getBlob } from './db.js';
+import { phaseInfo } from './model.js';
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) =>
@@ -145,6 +147,69 @@ export function openEstimateDoc(site, est) {
   printDoc(`見積書_${site.name}`, inner);
 }
 
+// 施工写真報告書 PDF。選択した写真を工程別にレイアウトして印刷/PDF保存できる。
+// 写真Blobは data URL に変換して埋め込む（別ウィンドウでも確実に表示されるため）。
+function blobToDataURL(blob) {
+  return new Promise((resolve) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => resolve('');
+    r.readAsDataURL(blob);
+  });
+}
+
+export async function openPhotoReportDoc(site, photos) {
+  const c = getCompany();
+  // 各写真を data URL 化
+  const items = [];
+  for (const p of photos) {
+    const blob = await getBlob(p.id);
+    if (!blob) continue;
+    items.push({ ...p, dataUrl: await blobToDataURL(blob) });
+  }
+  // 工程別にグループ化（PHASESの順）
+  const order = ['before', 'during', 'after', 'material', 'defect', 'extra'];
+  const groups = order.map((key) => ({ key, label: phaseInfo(key).label, list: items.filter((x) => x.phase === key) }))
+    .filter((g) => g.list.length);
+
+  const cell = (it) => `<figure class="pr-cell">
+    <img src="${it.dataUrl}" alt="">
+    <figcaption>${esc(it.comment || phaseInfo(it.phase).label)}${it.takenBy ? `／${esc(it.takenBy)}` : ''}<br>
+      <span class="pr-date">${jdate(new Date(it.createdAt).toISOString().slice(0, 10))}</span></figcaption>
+  </figure>`;
+
+  const body = groups.map((g) => `<section class="pr-sec">
+    <h2 class="pr-h2">${esc(g.label)}（${g.list.length}枚）</h2>
+    <div class="pr-grid">${g.list.map(cell).join('')}</div>
+  </section>`).join('') || '<p>写真がありません。</p>';
+
+  const inner = `
+    <h1 class="doc-title" style="letter-spacing:4px">施工写真報告書</h1>
+    <div class="top">
+      <div class="to">
+        <div class="name">${esc(site.customer || 'お客様')} 様</div>
+        <div class="meta">
+          件名: ${esc(site.name)}<br>
+          ${site.address ? `現場: ${esc(site.address)}<br>` : ''}
+          発行日: ${jdate()}
+        </div>
+      </div>
+      ${fromBlock(c)}
+    </div>
+    ${body}
+    <div class="foot">施工状況をご報告いたします。ご確認のほどよろしくお願いいたします。</div>
+    <style>
+      .pr-sec { margin-top: 18px; page-break-inside: auto; }
+      .pr-h2 { font-size: 15px; border-left: 5px solid #1a2330; padding-left: 8px; margin: 0 0 8px; }
+      .pr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      .pr-cell { margin: 0; border: 1px solid #c4ccd6; border-radius: 6px; overflow: hidden; page-break-inside: avoid; }
+      .pr-cell img { width: 100%; height: 150px; object-fit: cover; display: block; }
+      .pr-cell figcaption { font-size: 12px; padding: 6px 8px; }
+      .pr-date { color: #777; }
+    </style>`;
+  printDoc(`写真報告書_${site.name}`, inner);
+}
+
 // 御請求書 PDF（site.contractAmount または見積合計を税込合計として扱う）
 export function openInvoiceDoc(site, opts = {}) {
   const c = getCompany();
@@ -178,6 +243,7 @@ export function openInvoiceDoc(site, opts = {}) {
     </table>
     <div class="terms">
       お振込先<div class="box">${esc(c.bank || '（振込先が未設定です。共有タブの自社情報で登録してください）')}</div>
+      ${(opts.notes || site.invoiceNote) ? `備考<div class="box">${esc(opts.notes || site.invoiceNote)}</div>` : ''}
     </div>
     <div class="foot">お振込手数料はお客様にてご負担くださいますようお願い申し上げます。</div>`;
   printDoc(`請求書_${site.name}`, inner);

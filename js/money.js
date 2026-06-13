@@ -4,6 +4,7 @@
 import { store } from './db.js';
 import { h, toast, openModal, clear } from './ui.js';
 import { todayStr, yen } from './model.js';
+import { openInvoiceDoc } from './doc.js';
 
 // 日付文字列(yyyy-mm-dd)に日数を足す。未指定なら今日基準。
 export function addDays(baseStr, days) {
@@ -23,18 +24,24 @@ export function markInvoiced(site, onDone) {
   const invoiceDate = h('input', { type: 'date', value: todayStr() });
   // 入金予定日の既定は請求日＋30日（一般的な月末締め翌月払いの目安）
   const dueDate = h('input', { type: 'date', value: addDays(todayStr(), 30) });
+  const note = h('textarea', { placeholder: '例）追加工事分を含みます／お振込は月末まで', style: 'min-height:48px' }, site.invoiceNote || '');
 
   const save = () => {
-    store.update('sites', site.id, {
+    const updated = store.update('sites', site.id, {
       status: 'billed',
       contractAmount: amount.value ? parseInt(amount.value, 10) : (site.contractAmount || site.estimateAmount || null),
       invoiceDate: invoiceDate.value,
       paymentDueDate: dueDate.value,
       paymentStatus: 'unpaid',
+      invoiceNote: note.value.trim(),
     });
-    clear(document.getElementById('modal-root'));
     toast('請求済みにしました 🧾');
-    onDone && onDone();
+    // 続けて請求書PDFを出せる導線（自動で開かず、本人に選ばせる）
+    openModal('請求済みにしました ✅', h('div', {}, [
+      h('p', { class: 'sub mt-0', text: 'そのまま請求書を出して、お客様に送れます。' }),
+      h('button', { class: 'btn', text: '📄 請求書をPDFで開く', onclick: () => { openInvoiceDoc(updated); clear(document.getElementById('modal-root')); onDone && onDone(); } }),
+      h('button', { class: 'btn ghost', text: '閉じる', onclick: () => { clear(document.getElementById('modal-root')); onDone && onDone(); } }),
+    ]));
   };
 
   openModal('請求書を作成（請求済みにする）', h('div', {}, [
@@ -44,7 +51,8 @@ export function markInvoiced(site, onDone) {
       h('div', { class: 'field' }, [h('label', { text: '請求日' }), invoiceDate]),
       h('div', { class: 'field' }, [h('label', { text: '入金予定日' }), dueDate]),
     ]),
-    h('div', { class: 'hint', text: '入金予定日を過ぎても入金が無い場合、ホームの「お金が漏れるぞ」でお知らせします。' }),
+    h('div', { class: 'field' }, [h('label', { text: '備考（請求書に表示・任意）' }), note]),
+    h('div', { class: 'hint', text: '入金予定日を過ぎても入金が無い場合、ホームの「今日やること」でお知らせします。' }),
     h('button', { class: 'btn', text: '請求済みにする', onclick: save }),
   ]));
 }

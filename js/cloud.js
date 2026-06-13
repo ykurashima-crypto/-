@@ -43,7 +43,7 @@ const MAP = {
     contractAmount: 'contract_amount', constructionStart: 'construction_start',
     completionDate: 'completion_date', invoiceDate: 'invoice_date', paymentDueDate: 'payment_due_date',
     paymentDate: 'payment_date', paymentStatus: 'payment_status', nextContact: 'next_contact', memo: 'memo',
-    workStart: 'work_start', workEnd: 'work_end' },
+    workStart: 'work_start', workEnd: 'work_end', invoiceNote: 'invoice_note' },
   customers: { name: 'name', phone: 'phone', address: 'address', channel: 'channel',
     inquiryDate: 'inquiry_date', email: 'email', postalCode: 'postal_code',
     customerType: 'customer_type', memo: 'note' },
@@ -58,7 +58,7 @@ const MAP = {
     materials: 'materials', hours: 'hours', problems: 'problems' },
   estimates: { siteId: 'site_id', total: 'total', sell: 'sell', profit: 'profit', margin: 'margin' },
   photos: { siteId: 'site_id', reportId: 'report_id', phase: 'phase', comment: 'comment',
-    size: 'size', storagePath: 'storage_path' },
+    size: 'size', storagePath: 'storage_path', takenBy: 'taken_by' },
 };
 const COMMON_OUT = ['id', 'deleted'];
 

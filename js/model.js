@@ -19,11 +19,14 @@ export function statusInfo(key) {
   return STATUSES.find((s) => s.key === key) || { key, label: key, cls: '' };
 }
 
-// 写真フェーズ
+// 写真フェーズ（工程別分類）
 export const PHASES = [
   { key: 'before', label: '施工前', cls: 'phase-before' },
   { key: 'during', label: '施工中', cls: 'phase-during' },
   { key: 'after',  label: '施工後', cls: 'phase-after' },
+  { key: 'material', label: '材料缶', cls: 'phase-material' },
+  { key: 'defect', label: '不具合', cls: 'phase-defect' },
+  { key: 'extra',  label: '追加工事', cls: 'phase-extra' },
 ];
 export function phaseInfo(key) {
   return PHASES.find((p) => p.key === key) || PHASES[0];
@@ -86,7 +89,8 @@ export async function addPhoto({ siteId, reportId = null, phase, comment = '', f
   const blob = await downscaleToBlob(file);
   const id = uid('photo');
   await putBlob(id, blob);
-  return store.insert('photos', { id, siteId, reportId, phase, comment, size: blob.size });
+  const takenBy = localStorage.getItem('nurilog.worker') || '';
+  return store.insert('photos', { id, siteId, reportId, phase, comment, size: blob.size, takenBy });
 }
 
 // ---- 初回サンプルデータ投入 ----

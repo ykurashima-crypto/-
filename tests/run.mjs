@@ -201,6 +201,21 @@ test('upcomingSteps は未完了を予定日順に', () => {
   assert.equal(up[0].processType, '下塗り');
 });
 
+group('写真分類 / 請求書連動');
+test('写真カテゴリは6種（施工前/中/後/材料缶/不具合/追加工事）', async () => {
+  const { PHASES, phaseInfo } = await import(J('js/model.js'));
+  assert.equal(PHASES.length, 6);
+  assert.equal(phaseInfo('material').label, '材料缶');
+  assert.equal(phaseInfo('defect').label, '不具合');
+  assert.equal(phaseInfo('extra').label, '追加工事');
+});
+test('請求書に備考が入る（site.invoiceNote / opts.notes）', () => {
+  captured = '';
+  openInvoiceDoc({ name: 'A', customer: 'B', contractAmount: 110000, invoiceNote: '追加工事を含みます' });
+  assert.ok(captured.includes('備考'));
+  assert.ok(captured.includes('追加工事を含みます'));
+});
+
 group('見積書・請求書PDF');
 test('見積書に明細・税込合計・消費税が入る', () => {
   setCompany({ name: '伊藤塗装', phone: '090', bank: '〇〇銀行 普通 123' });

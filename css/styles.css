@@ -209,6 +209,9 @@ body {
 .phase-before { background: #6b7a8d; }
 .phase-during { background: var(--amber); }
 .phase-after { background: var(--green); }
+.phase-material { background: #7a5cc0; }
+.phase-defect { background: var(--red); }
+.phase-extra { background: #c06a12; }
 
 /* Photo grids */
 .photo-strip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
@@ -221,6 +224,12 @@ body {
 .photo-thumb .phase-tag { position: absolute; left: 4px; top: 4px; }
 .photo-thumb .del { position: absolute; right: 4px; top: 4px; background: rgba(0,0,0,.6); color:#fff; border:0; border-radius:6px; width:22px; height:22px; font-size:14px; }
 .photo-strip .photo-thumb { width: 92px; flex: 0 0 92px; }
+.photo-thumb.sel { cursor: pointer; }
+.photo-thumb.sel.on { outline: 3px solid var(--gold); outline-offset: -3px; }
+.photo-thumb .sel-check { position: absolute; right: 4px; bottom: 4px; width: 24px; height: 24px;
+  border-radius: 50%; background: var(--gold); color: #1a140d; font-weight: 900; font-size: 15px;
+  display: flex; align-items: center; justify-content: center; }
+.photo-thumb.sel:not(.on) .sel-check { background: rgba(0,0,0,.5); color: transparent; }
 
 /* Empty state */
 .empty { text-align: center; color: var(--muted); padding: 36px 14px; }
