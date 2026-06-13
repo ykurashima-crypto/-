@@ -201,6 +201,27 @@ test('upcomingSteps は未完了を予定日順に', () => {
   assert.equal(up[0].processType, '下塗り');
 });
 
+group('バックアップ / 復元');
+test('エクスポート→全消去→復元でデータが戻る', async () => {
+  const { exportData, importBackup, validateBackup } = await import(J('js/backup.js'));
+  reset();
+  store.insert('sites', { name: '田中邸', status: 'work' });
+  store.insert('customers', { name: '田中', phone: '090' });
+  const backup = exportData();
+  assert.ok(validateBackup(backup));
+  reset(); // 端末初期化を想定
+  assert.equal(store.all('sites').length, 0);
+  await importBackup(backup);
+  assert.equal(store.all('sites').length, 1);
+  assert.equal(store.all('sites')[0].name, '田中邸');
+  assert.equal(store.all('customers')[0].name, '田中');
+});
+test('不正なバックアップは拒否', async () => {
+  const { validateBackup } = await import(J('js/backup.js'));
+  assert.equal(validateBackup({ app: 'other' }), false);
+  assert.equal(validateBackup(null), false);
+});
+
 group('音声入力ヘルパー（無料の簡易抽出）');
 test('parsePhone / parseDate', async () => {
   const { parsePhone, parseDate } = await import(J('js/voice.js'));

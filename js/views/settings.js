@@ -8,6 +8,43 @@ import {
 import { cloudEnabled, cloudState, signOut, cloudSync } from '../cloud.js';
 import { getCompany, setCompany, planLabel } from '../company.js';
 import { downscaleToBlob } from '../model.js';
+import { downloadBackup, importBackup, validateBackup } from '../backup.js';
+
+// データのバックアップ／復元カード。
+function backupCard() {
+  const withPhotos = h('input', { type: 'checkbox', checked: 'checked' });
+  const fileInput = h('input', {
+    type: 'file', accept: 'application/json,.json', style: 'display:none',
+    onchange: (e) => {
+      const file = e.target.files[0]; if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async () => {
+        let obj; try { obj = JSON.parse(reader.result); } catch { toast('ファイルを読めませんでした'); return; }
+        if (!validateBackup(obj)) { toast('バックアップ形式が正しくありません'); return; }
+        if (!confirm('現在のデータをこのバックアップで置き換えます。よろしいですか？')) return;
+        try { const r = await importBackup(obj); toast(`復元しました（${r.count}件）`); setTimeout(() => location.reload(), 800); }
+        catch (err) { toast('復元に失敗: ' + (err.message || err)); }
+      };
+      reader.readAsText(file);
+      e.target.value = '';
+    },
+  });
+
+  return h('div', {}, [
+    h('div', { class: 'section-title', text: 'バックアップ' }),
+    h('div', { class: 'card' }, [
+      h('p', { class: 'sub mt-0', text: '端末が変わっても戻せるよう、データをファイルに保存できます。' }),
+      h('label', { class: 'check-row' }, [withPhotos, h('span', { text: ' 写真も含める（ファイルが大きくなります）' })]),
+      h('button', {
+        class: 'btn', text: '📥 バックアップを保存',
+        onclick: async () => { toast('作成中…'); const r = await downloadBackup(withPhotos.checked); toast(`保存しました（${r.count}件・写真${r.photos}枚）`); },
+      }),
+      h('button', { class: 'btn ghost', text: '♻️ バックアップから復元', onclick: () => fileInput.click() }),
+      fileInput,
+      h('div', { class: 'hint', text: 'クラウド利用時はSupabase側にも保存されます。定期的にこのファイル保存もおすすめします。' }),
+    ]),
+  ]);
+}
 
 // 自社情報（見積書・請求書PDFのヘッダー／振込先に使う）の編集カード。
 function companyCard() {
@@ -100,6 +137,7 @@ export function renderSettings() {
       !s.companyId ? h('div', { class: 'warn-box bad', text: '会社が未割当です。管理者がSupabaseでprofilesにcompanyIdを設定すると、データが表示されます。' }) : null,
       h('p', { class: 'sub', text: 'データは会社単位でクラウド保存され、別の端末からも同じ内容を確認できます。' }),
       companyCard(),
+      backupCard(),
     ]);
   }
 
@@ -174,6 +212,7 @@ export function renderSettings() {
     h('div', { class: 'section-title', text: 'この端末のデータ' }),
     counts,
     h('p', { class: 'sub', text: 'ヒント: PCでサーバーを起動し、職人さんのスマホで同じチームコードを入力すると、現場の写真・日報がリアルタイムに集約されます。' }),
+    backupCard(),
   ]);
 }
 
