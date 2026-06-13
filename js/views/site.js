@@ -9,6 +9,7 @@ import {
 import { navigate } from '../app.js';
 import { openCaseForm } from './admin.js';
 import { markInvoiced, markPaid } from '../money.js';
+import { openEstimateDoc, openInvoiceDoc } from '../doc.js';
 
 // ---------- 現場詳細 ----------
 export function renderSite(siteId) {
@@ -77,6 +78,9 @@ export function renderSite(siteId) {
     ? h('button', { class: 'btn secondary', text: '🧮 この現場の見積を作る', onclick: () => navigate('estimate/' + s.id) })
     : null;
 
+  // 書類PDF（管理者）。見積はこの現場の最新見積、無ければ見積金額の一式から生成。
+  const docButtons = isAdmin ? documentBlock(s) : null;
+
   // 管理者向け: 案件の編集・削除
   const adminActions = isAdmin
     ? h('div', { class: 'btn-row' }, [
@@ -108,7 +112,25 @@ export function renderSite(siteId) {
     h('div', { class: 'section-title', text: '案件情報' }),
     infoCard,
     estimateBtn,
+    docButtons,
     adminActions,
+  ]);
+}
+
+// 見積書・請求書のPDF出力ボタン群。状況に応じて出せる書類だけ表示する。
+function documentBlock(s) {
+  const latestEst = store.all('estimates')
+    .filter((e) => e.siteId === s.id)
+    .sort((a, b) => b.createdAt - a.createdAt)[0] || null;
+  const canEstimate = !!(latestEst || s.estimateAmount);
+  const canInvoice = !!(s.contractAmount || s.estimateAmount) && ['done', 'billed', 'paid'].includes(s.status);
+  if (!canEstimate && !canInvoice) return null;
+  return h('div', {}, [
+    h('div', { class: 'section-title', text: '書類（PDF）' }),
+    h('div', { class: 'btn-row' }, [
+      canEstimate ? h('button', { class: 'btn secondary', text: '📄 見積書', onclick: () => openEstimateDoc(s, latestEst) }) : null,
+      canInvoice ? h('button', { class: 'btn secondary', text: '📄 請求書', onclick: () => openInvoiceDoc(s) }) : null,
+    ]),
   ]);
 }
 

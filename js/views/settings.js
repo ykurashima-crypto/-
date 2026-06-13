@@ -6,6 +6,63 @@ import {
   onSyncEvent, resetCursorsForFullSync,
 } from '../sync.js';
 import { cloudEnabled, cloudState, signOut, cloudSync } from '../cloud.js';
+import { getCompany, setCompany } from '../company.js';
+import { downscaleToBlob } from '../model.js';
+
+// 自社情報（見積書・請求書PDFのヘッダー／振込先に使う）の編集カード。
+function companyCard() {
+  const c = getCompany();
+  const f = {};
+  const field = (key, label, ph = '', type = 'text') => {
+    const el = h('input', { type, placeholder: ph, value: c[key] || '' });
+    f[key] = el;
+    return h('div', { class: 'field' }, [h('label', { text: label }), el]);
+  };
+  const bank = h('textarea', { placeholder: '例）〇〇銀行 △△支店 普通 1234567 ｶﾌﾞｼｷｶﾞｲｼｬ◯◯', style: 'min-height:56px' }, c.bank || '');
+
+  // ロゴ（任意）。長辺240pxへ縮小してdataURLで保存（localStorage節約）。
+  const logoImg = h('img', { alt: '', style: 'max-height:46px;border-radius:6px;' + (c.logo ? '' : 'display:none') });
+  if (c.logo) logoImg.src = c.logo;
+  const logoState = { dataUrl: c.logo || '' };
+  const logoInput = h('input', {
+    type: 'file', accept: 'image/*', style: 'display:none',
+    onchange: async (e) => {
+      const file = e.target.files[0]; if (!file) return;
+      const blob = await downscaleToBlob(file, 240, 0.8);
+      const reader = new FileReader();
+      reader.onload = () => { logoState.dataUrl = reader.result; logoImg.src = reader.result; logoImg.style.display = ''; };
+      reader.readAsDataURL(blob);
+      e.target.value = '';
+    },
+  });
+
+  const save = () => {
+    setCompany({
+      name: f.name.value.trim(), owner: f.owner.value.trim(), postalCode: f.postalCode.value.trim(),
+      address: f.address.value.trim(), phone: f.phone.value.trim(), email: f.email.value.trim(),
+      invoiceRegNo: f.invoiceRegNo.value.trim(), bank: bank.value.trim(), logo: logoState.dataUrl,
+    });
+    toast('自社情報を保存しました');
+  };
+
+  return h('div', {}, [
+    h('div', { class: 'section-title', text: '自社情報（見積書・請求書に使います）' }),
+    h('div', { class: 'card' }, [
+      field('name', '屋号 / 会社名', '例）伊藤塗装'),
+      h('div', { class: 'grid-2' }, [field('owner', '代表者名', '例）伊藤 太郎'), field('phone', '電話番号', '090-...', 'tel')]),
+      h('div', { class: 'grid-2' }, [field('postalCode', '郵便番号', '123-4567'), field('email', 'メール', '任意', 'email')]),
+      field('address', '住所', '市区町村〜番地'),
+      field('invoiceRegNo', 'インボイス登録番号', 'T1234567890123'),
+      h('div', { class: 'field' }, [h('label', { text: '振込先（請求書に表示）' }), bank]),
+      h('div', { class: 'field' }, [
+        h('label', { text: 'ロゴ（任意）' }),
+        h('div', { class: 'btn-row' }, [logoImg, h('button', { class: 'btn ghost sm', text: '画像を選ぶ', onclick: () => logoInput.click() })]),
+        logoInput,
+      ]),
+      h('button', { class: 'btn', text: '自社情報を保存', onclick: save }),
+    ]),
+  ]);
+}
 
 export function renderSettings() {
   // 本番(クラウド)モード: アカウント情報とログアウトを表示（チームコード共有は使わない）
@@ -26,6 +83,7 @@ export function renderSettings() {
       ]),
       !s.companyId ? h('div', { class: 'warn-box bad', text: '会社が未割当です。管理者がSupabaseでprofilesにcompanyIdを設定すると、データが表示されます。' }) : null,
       h('p', { class: 'sub', text: 'データは会社単位でクラウド保存され、別の端末からも同じ内容を確認できます。' }),
+      companyCard(),
     ]);
   }
 
@@ -82,6 +140,7 @@ export function renderSettings() {
 
   return h('div', {}, [
     h('h1', { class: 'page-title', text: '共有設定' }),
+    companyCard(),
     h('div', { class: 'card' }, [
       h('p', { class: 'sub mt-0', text: '同じ「チームコード」を入力した職人・管理者の間で、案件・日報・写真・見積を共有します。サーバーURLを空欄にすると、このアプリを配信しているサーバーに接続します。' }),
       h('div', { class: 'field' }, [h('label', { text: 'サーバーURL' }), serverInput]),
