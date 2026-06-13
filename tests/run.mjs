@@ -35,6 +35,7 @@ const { addDays, billableAmount } = await import(J('js/money.js'));
 const { getPlan, planLabel, isOnboarded, setOnboarded, setCompany } = await import(J('js/company.js'));
 const { openEstimateDoc, openInvoiceDoc } = await import(J('js/doc.js'));
 const { caseEvents } = await import(J('js/views/calendar.js'));
+const { scheduleStatus, plannedPeriod, completeProcess, currentStep, upcomingSteps } = await import(J('js/views/process.js'));
 const reset = () => store.replaceAll({});
 
 group('db / ID');
@@ -128,6 +129,50 @@ test('雨天延期で以降の未完了工程だけがまとめてズレる', ()
   assert.equal(a.find((p) => p.processType === '養生').scheduledDate, '2026-06-15');
   assert.equal(a.find((p) => p.processType === '高圧洗浄').scheduledDate, '2026-06-11'); // 完了済みは不変
   assert.equal(a.find((p) => p.processType === '足場').scheduledDate, '2026-06-10'); // 前工程は不変
+});
+
+group('職人の予定 / 工程の進捗・前倒し遅れ');
+function seedProcesses(siteId, items) {
+  items.forEach((it, i) => store.insert('processes', { siteId, processType: it.t, status: it.done ? 'done' : 'todo', scheduledDate: it.s, completedDate: it.c || '', sortOrder: i }));
+}
+test('未完了で予定日が過去 → 遅れ日数', () => {
+  reset();
+  const site = store.insert('sites', { name: 'A', status: 'work' });
+  seedProcesses(site.id, [{ t: '足場', s: '2026-06-01', done: true, c: '2026-06-01' }, { t: '下塗り', s: '2026-06-10' }]);
+  const ss = scheduleStatus(site.id, '2026-06-13');
+  assert.equal(ss.state, 'behind');
+  assert.equal(ss.days, 3);
+});
+test('予定より早く完了 → 前倒し', () => {
+  reset();
+  const site = store.insert('sites', { name: 'B', status: 'work' });
+  seedProcesses(site.id, [{ t: '足場', s: '2026-06-10', done: true, c: '2026-06-08' }, { t: '洗浄', s: '2026-06-20' }]);
+  const ss = scheduleStatus(site.id, '2026-06-12');
+  assert.equal(ss.state, 'ahead');
+  assert.equal(ss.days, 2);
+});
+test('currentStep は最初の未完了、completeProcess で進む', () => {
+  reset();
+  const site = store.insert('sites', { name: 'C', status: 'work', constructionStart: '2026-06-10', completionDate: '2026-06-20' });
+  seedProcesses(site.id, [{ t: '足場', s: '2026-06-10' }, { t: '洗浄', s: '2026-06-11' }]);
+  assert.equal(currentStep(site.id).processType, '足場');
+  completeProcess(currentStep(site.id).id, '2026-06-10');
+  assert.equal(currentStep(site.id).processType, '洗浄');
+  const pp = plannedPeriod(site.id);
+  assert.equal(pp.start, '2026-06-10');
+  assert.equal(pp.end, '2026-06-20');
+});
+test('upcomingSteps は未完了を予定日順に', () => {
+  reset();
+  const a = store.insert('sites', { name: 'A', status: 'work' });
+  const b = store.insert('sites', { name: 'B', status: 'work' });
+  store.insert('processes', { siteId: a.id, processType: '上塗り', status: 'todo', scheduledDate: '2026-06-20', sortOrder: 0 });
+  store.insert('processes', { siteId: b.id, processType: '下塗り', status: 'todo', scheduledDate: '2026-06-15', sortOrder: 0 });
+  store.insert('processes', { siteId: a.id, processType: '足場', status: 'done', scheduledDate: '2026-06-10', sortOrder: 1 });
+  const up = upcomingSteps([a.id, b.id]);
+  assert.equal(up.length, 2);
+  assert.equal(up[0].name, 'B'); // 6/15が先
+  assert.equal(up[0].processType, '下塗り');
 });
 
 group('見積書・請求書PDF');

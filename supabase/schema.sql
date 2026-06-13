@@ -122,6 +122,8 @@ alter table public.sites add column if not exists payment_status   text;
 -- 顧客への紐付け（クライアント採番の文字列IDも保持できるよう text）
 alter table public.sites add column if not exists customer_id      text;
 alter table public.sites add column if not exists memo             text;
+alter table public.sites add column if not exists work_start       text;
+alter table public.sites add column if not exists work_end         text;
 
 -- 会社テーブルの拡張（プラン区分・事業者情報・招待コード）
 alter table public.companies add column if not exists plan_type text not null default 'individual';

@@ -189,6 +189,14 @@ body {
 .alert-actions { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 .alert-actions .btn-row { margin-top: 0; }
 
+/* 職人スケジュール */
+.next-site { border-left: 5px solid var(--primary); background: #eef3ff; }
+.phase-flow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.phase-chip { font-size: 12px; font-weight: 600; padding: 4px 9px; border-radius: 999px;
+  background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); }
+.phase-chip.done { background: #e3f6ec; color: #117a44; border-color: #aedcc2; }
+.phase-chip.cur { background: #1f6feb; color: #fff; border-color: #1f6feb; }
+
 /* 案件カレンダー */
 .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .cal-head .btn.sm { width: 44px; }

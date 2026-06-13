@@ -25,10 +25,69 @@ function siteProcesses(siteId) {
   return store.all('processes').filter((p) => p.siteId === siteId)
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
 }
+export { siteProcesses };
+
 export function processProgress(siteId) {
   const list = siteProcesses(siteId);
   if (!list.length) return null;
   return { done: list.filter((p) => p.status === 'done').length, total: list.length };
+}
+
+const DAY = 86400000;
+function daysBetween(a, b) { return Math.round((Date.parse(b + 'T00:00:00') - Date.parse(a + 'T00:00:00')) / DAY); }
+
+// 工期（予定）: 着工予定日 〜 完工日 or 最終工程の予定日
+export function plannedPeriod(siteId) {
+  const site = store.get('sites', siteId);
+  const list = siteProcesses(siteId);
+  const start = site?.constructionStart || (list[0] && list[0].scheduledDate) || '';
+  let end = site?.completionDate || '';
+  if (!end) for (const p of list) if (p.scheduledDate && p.scheduledDate > end) end = p.scheduledDate;
+  return { start, end };
+}
+
+// 納期に対して前倒し/遅れ/予定通りを判定（親方・職人がひと目で分かる用）。
+export function scheduleStatus(siteId, now = todayStr()) {
+  const list = siteProcesses(siteId);
+  if (!list.length) return null;
+  let behind = 0;
+  for (const p of list) {
+    if (p.status !== 'done' && p.scheduledDate && p.scheduledDate < now) {
+      behind = Math.max(behind, daysBetween(p.scheduledDate, now));
+    }
+  }
+  if (behind > 0) return { state: 'behind', days: behind, label: `${behind}日 遅れ`, cls: 's-billed' };
+  let ahead = 0;
+  for (const p of list) {
+    if (p.status === 'done' && p.completedDate && p.scheduledDate && p.completedDate < p.scheduledDate) {
+      ahead = Math.max(ahead, daysBetween(p.completedDate, p.scheduledDate));
+    }
+  }
+  if (ahead > 0) return { state: 'ahead', days: ahead, label: `${ahead}日 前倒し`, cls: 's-paid' };
+  return { state: 'onTrack', days: 0, label: '予定通り', cls: 's-won' };
+}
+
+// 今後の工程予定（職人カレンダー用）: 未完了の工程を予定日順に。
+export function upcomingSteps(siteIds, limit = 12) {
+  const set = new Set(siteIds);
+  const out = [];
+  for (const p of store.all('processes')) {
+    if (!set.has(p.siteId) || p.status === 'done' || !p.scheduledDate) continue;
+    const site = store.get('sites', p.siteId);
+    if (!site) continue;
+    out.push({ date: p.scheduledDate, processType: p.processType, siteId: p.siteId, name: site.name });
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date)).slice(0, limit);
+}
+
+// 次の工程（最初の未完了）
+export function currentStep(siteId) {
+  return siteProcesses(siteId).find((p) => p.status !== 'done') || null;
+}
+
+// 日報などから工程を完了にする（職人が進捗を更新する経路）。
+export function completeProcess(processId, dateStr) {
+  store.update('processes', processId, { status: 'done', completedDate: dateStr || todayStr() });
 }
 
 export function renderProcess(siteId) {

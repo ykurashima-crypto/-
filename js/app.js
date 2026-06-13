@@ -8,6 +8,7 @@ import { renderSite, renderReportForm, renderPhotoCapture } from './views/site.j
 import { renderCustomers, renderCustomer } from './views/customers.js';
 import { renderSurvey } from './views/survey.js';
 import { renderProcess } from './views/process.js';
+import { renderSchedule } from './views/schedule.js';
 import { renderEstimate } from './views/estimate.js';
 import { renderSettings } from './views/settings.js';
 import { renderLogin } from './views/login.js';
@@ -21,6 +22,7 @@ const ROLE_KEY = 'nurilog.role';
 const tabsByRole = {
   worker: [
     { route: 'worker', icon: '🏠', label: 'ホーム' },
+    { route: 'schedule', icon: '📅', label: '予定' },
     { route: 'photo',  icon: '📷', label: '写真' },
     { route: 'report', icon: '📝', label: '日報' },
     { route: 'settings', icon: '🔗', label: '共有' },
@@ -40,6 +42,7 @@ function setRole(role) { localStorage.setItem(ROLE_KEY, role); }
 // route文字列 -> 描画関数
 const routes = {
   worker: () => renderWorkerHome(),
+  schedule: () => renderSchedule(),
   photo: (id) => renderPhotoCapture(id),
   report: (id) => renderReportForm(id),
   admin: () => renderAdminHome(),
@@ -128,7 +131,7 @@ function setupRoleSwitch() {
 }
 
 // 同期で他端末の変更が入ったら、閲覧系の画面だけ再描画（入力中フォームは触らない）
-const REFRESH_ROUTES = ['worker', 'admin', 'cases', 'site', 'customers', 'customer', 'survey', 'process'];
+const REFRESH_ROUTES = ['worker', 'schedule', 'admin', 'cases', 'site', 'customers', 'customer', 'survey', 'process'];
 function onSynced() {
   const { route } = parseHash();
   if (REFRESH_ROUTES.includes(route)) render();

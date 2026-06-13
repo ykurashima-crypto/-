@@ -224,6 +224,7 @@ export function openCaseForm(site, onDone, preset = null) {
       input('inquiryDate', '問合せ日', 'date'),
     ]),
     h('div', { class: 'grid-2' }, [input('surveyDate', '現調予定日', 'date'), input('constructionStart', '着工予定日', 'date')]),
+    h('div', { class: 'grid-2' }, [input('workStart', '集合/作業開始', 'time'), input('workEnd', '作業終了予定', 'time')]),
     h('div', { class: 'field' }, [h('label', { text: 'ステータス' }), statusSel]),
     h('div', { class: 'field' }, [h('label', { text: 'メモ' }), memo]),
   ];
@@ -241,7 +242,8 @@ export function openCaseForm(site, onDone, preset = null) {
       name: f.name.value.trim(), customer: f.customer.value.trim(), phone: f.phone.value.trim(),
       manager: f.manager.value.trim(), address: f.address.value.trim(), channel: channelSel.value,
       inquiryDate: f.inquiryDate.value, surveyDate: f.surveyDate.value,
-      constructionStart: f.constructionStart.value, status: f.status.value, memo: memo.value.trim(),
+      constructionStart: f.constructionStart.value, workStart: f.workStart.value, workEnd: f.workEnd.value,
+      status: f.status.value, memo: memo.value.trim(),
       customerId: editing ? (site.customerId || null) : (preset?.customerId || null),
     };
     // 詳細項目は編集時のみ更新（新規では既存の最小項目だけ保存）

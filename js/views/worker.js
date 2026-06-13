@@ -2,6 +2,7 @@
 import { h } from '../ui.js';
 import { activeSites, statusInfo, sitePhotos, fmtDate } from '../model.js';
 import { navigate } from '../app.js';
+import { scheduleStatus, currentStep } from './process.js';
 
 export function renderWorkerHome() {
   const sites = activeSites();
@@ -36,14 +37,16 @@ function actionTile(icon, label, desc, onclick) {
 }
 
 function siteCard(s) {
-  const si = statusInfo(s.status);
-  const photoCount = sitePhotos(s.id).length;
+  const ss = scheduleStatus(s.id);
+  const cur = currentStep(s.id);
+  const time = (s.workStart || s.workEnd) ? `🕒 ${s.workStart || '—'}〜${s.workEnd || '—'}　` : '';
   return h('div', { class: 'card tap', onclick: () => navigate('site/' + s.id) }, [
     h('div', { class: 'card-row' }, [
       h('h3', { text: s.name }),
-      h('span', { class: 'pill ' + si.cls, text: si.label }),
+      ss ? h('span', { class: 'pill ' + ss.cls, text: ss.label }) : null,
     ]),
-    h('div', { class: 'sub', text: `${s.address || '住所未登録'}` }),
-    h('div', { class: 'sub', text: `担当: ${s.manager || '—'}　写真: ${photoCount}枚　開始: ${fmtDate(s.constructionStart)}` }),
+    h('div', { class: 'sub', text: `📍 ${s.address || '住所未登録'}` }),
+    h('div', { class: 'sub', text: `${time}担当: ${s.manager || '—'}` }),
+    cur ? h('div', { class: 'sub', text: `▶ いまの工程: ${cur.processType}（予定 ${fmtDate(cur.scheduledDate)}）` }) : null,
   ]);
 }

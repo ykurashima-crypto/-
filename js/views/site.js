@@ -11,7 +11,7 @@ import { openCaseForm } from './admin.js';
 import { markInvoiced, markPaid } from '../money.js';
 import { openEstimateDoc, openInvoiceDoc } from '../doc.js';
 import { latestSurvey, surveySummary } from './survey.js';
-import { processProgress } from './process.js';
+import { processProgress, siteProcesses, completeProcess } from './process.js';
 
 // ---------- 現場詳細 ----------
 export function renderSite(siteId) {
@@ -43,13 +43,20 @@ export function renderSite(siteId) {
       : h('div', {}, reports.map(reportCard)),
   ]);
 
-  // 案件情報（管理者はステータス変更可）
-  const infoRows = [
+  // 案件情報（管理者はステータス変更可）。
+  // 職人(worker)には金額・お金まわりは一切表示しない。
+  const infoRows = isAdmin ? [
     ['顧客', s.customer], ['連絡先', s.phone], ['住所', s.address],
     ['担当', s.manager], ['問合せ経路', s.channel],
     ['問合せ日', fmtDate(s.inquiryDate)], ['現調', fmtDate(s.surveyDate)],
     ['見積提出', fmtDate(s.estimateDate)], ['見積金額', s.estimateAmount ? yen(s.estimateAmount) : '—'],
     ['着工予定', fmtDate(s.constructionStart)], ['次回連絡', fmtDate(s.nextContact)],
+    ['メモ', s.memo],
+  ] : [
+    ['顧客', s.customer], ['住所', s.address], ['担当', s.manager],
+    ['現調', fmtDate(s.surveyDate)],
+    ['着工予定', fmtDate(s.constructionStart)],
+    ['作業時間', (s.workStart || s.workEnd) ? `${s.workStart || '—'}〜${s.workEnd || '—'}` : '—'],
     ['メモ', s.memo],
   ];
   const infoCard = h('div', { class: 'card' }, infoRows.map(([k, v]) =>
@@ -86,8 +93,8 @@ export function renderSite(siteId) {
   // 現地調査（記録があれば要約、無ければ作成導線）
   const surveySection = surveyBlock(s);
 
-  // 工程（進捗サマリー or 作成導線）。管理者のみ表示。
-  const processSection = isAdmin ? processBlock(s) : null;
+  // 工程（進捗サマリー）。職人も作業フェーズを確認できるよう全員に表示。
+  const processSection = processBlock(s);
 
   // 管理者向け: 案件の編集・削除
   const adminActions = isAdmin
@@ -358,6 +365,17 @@ export function renderReportForm(arg) {
   const hoursInput = h('input', { type: 'number', step: '0.5', min: '0', placeholder: '例）7.5' });
   const problemInput = h('textarea', { placeholder: '例）破風板に腐食あり。追加で板金補修が必要（写真添付済）' });
 
+  // 今日完了した工程（選ぶと、その工程を完了にして進捗を進める）。現場切替で中身を更新。
+  const processSel = h('select', {});
+  const fillProcess = () => {
+    const todo = siteProcesses(siteSel.value).filter((p) => p.status !== 'done');
+    processSel.replaceChildren(
+      h('option', { value: '', text: '（なし）' }),
+      ...todo.map((p) => h('option', { value: p.id, text: p.processType })));
+  };
+  fillProcess();
+  siteSel.addEventListener('change', fillProcess);
+
   // 添付写真（送信時に日報へ紐付け）
   const pending = []; // {file, phase}
   const pendingGrid = h('div', { class: 'photo-grid' });
@@ -399,7 +417,9 @@ export function renderReportForm(arg) {
     for (const item of pending) {
       await addPhoto({ siteId, reportId: report.id, phase: item.phase, comment: '', file: item.file });
     }
-    toast('日報を送信しました');
+    // 日報から工程の完了を反映（職人が進捗を更新する経路）
+    if (processSel.value) completeProcess(processSel.value, dateInput.value);
+    toast(processSel.value ? '日報を送信し、工程を完了にしました' : '日報を送信しました');
     navigate('site/' + siteId);
   };
 
@@ -418,6 +438,8 @@ export function renderReportForm(arg) {
     ]),
     h('div', { class: 'field' }, [h('label', { text: '作業者' }), workerInput]),
     h('div', { class: 'field' }, [h('label', { text: '作業内容' }), contentInput]),
+    h('div', { class: 'field' }, [h('label', { text: '今日完了した工程' }), processSel,
+      h('div', { class: 'hint', text: '選ぶと工程表の進捗が進みます（前倒し/遅れの判定にも反映）' })]),
     h('div', { class: 'field' }, [h('label', { text: '使用材料' }), materialInput]),
     problemField,
     h('div', { class: 'field' }, [
