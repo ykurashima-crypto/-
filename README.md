@@ -107,6 +107,28 @@ npm start          # = node server/server.js  （既定ポート 8787）
 > スマホからPCのサーバーに接続する場合は、サーバーURLに `http://<PCのIP>:8787` を指定します
 > （同一Wi-Fi内）。社外からも使うなら、このサーバーをクラウド（HTTPS）へ配置してください。
 
+## テスト
+
+```bash
+npm test    # tests/run.mjs（依存なし）。アラート判定・税/粗利・工程延期・PDF生成・RLS静的検査
+```
+
+## ドキュメント
+
+- [CLAUDE.md](CLAUDE.md)：設計方針・命名・データ分離・権限・テスト要件・同期コレクション追加手順
+- [docs/DATABASE.md](docs/DATABASE.md)：テーブル定義・RLS・RPC
+- [docs/PERMISSIONS.md](docs/PERMISSIONS.md)：権限一覧
+- [docs/SCREENS.md](docs/SCREENS.md)：画面・ルート一覧
+- [docs/PHASES.md](docs/PHASES.md)：実装フェーズの進捗
+- [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md)：既知の問題・未実装機能
+- [docs/PRODUCTION_SETUP.md](docs/PRODUCTION_SETUP.md)：本番(Supabase + Cloudflare Pages)手順
+- [.env.example](.env.example)：環境変数サンプル
+
+## デモアカウント / デモデータ
+
+- **デモモード**：初回起動で6件のサンプル案件＋2件の顧客を自動投入（請求漏れ・入金漏れ案件を含む）。ログイン不要。
+- **本番デモ**：`supabase/seed_demo.sql`（`is_demo=true` の会社へ投入。パスワードはコードに書かず Supabase Auth で作成）。
+
 ## 技術構成
 
 - フロント・バックエンドとも**依存ライブラリゼロ**。ビルド工程なし
