@@ -75,8 +75,8 @@ export function changesSince(code, cursor) {
 }
 
 export function blobPath(id) {
-  // パストラバーサル防止: idは英数とアンダースコアのみ許可
-  if (!/^[A-Za-z0-9_]+$/.test(id)) return null;
+  // パストラバーサル防止: idは英数・アンダースコア・ハイフンのみ許可（UUIDのハイフンを含む）
+  if (!/^[A-Za-z0-9_-]+$/.test(id)) return null;
   return path.join(BLOB_DIR, id);
 }
 

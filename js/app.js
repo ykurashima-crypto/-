@@ -145,7 +145,9 @@ function applyCloudRole() {
 }
 
 async function boot() {
-  seedIfEmpty();
+  // デモデータは「デモ(端末内保存)モード」だけに投入する。
+  // 本番(クラウド)モードでは会社の実データのみを扱い、デモ用seedを混入させない。
+  if (!cloudEnabled()) seedIfEmpty();
   setupRoleSwitch();
   onSyncEvent(updateSyncBadge);
   updateSyncBadge();
