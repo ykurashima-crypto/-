@@ -168,11 +168,12 @@ export function renderCases() {
 }
 
 // 案件の新規登録・編集を兼ねるフォーム。site を渡すと編集、null なら新規。
-export function openCaseForm(site, onDone) {
+// preset を渡すと新規時に初期値を流し込む（例: 顧客詳細から「この顧客で新規案件」）。
+export function openCaseForm(site, onDone, preset = null) {
   const editing = !!site;
   const f = {};
   const input = (key, label, type = 'text', ph = '') => {
-    const v = editing ? (site[key] ?? '') : '';
+    const v = editing ? (site[key] ?? '') : (preset?.[key] ?? '');
     const el = h('input', { type, placeholder: ph, value: type === 'number' ? (v ?? '') : v });
     f[key] = el;
     return h('div', { class: 'field' }, [h('label', { text: label }), el]);
@@ -206,6 +207,7 @@ export function openCaseForm(site, onDone) {
           nextContact: f.nextContact.value, status: f.status.value,
           estimateAmount: f.estimateAmount.value ? parseInt(f.estimateAmount.value, 10) : null,
           contractAmount: f.contractAmount.value ? parseInt(f.contractAmount.value, 10) : null,
+          customerId: editing ? (site.customerId || null) : (preset?.customerId || null),
         };
         if (editing) { store.update('sites', site.id, data); toast('案件を更新しました'); }
         else { store.insert('sites', data); toast('案件を登録しました'); }

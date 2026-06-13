@@ -34,12 +34,15 @@ export function currentRole() { return profile?.role || null; }
 
 // ローカル↔DB のフィールド対応（camelCase ↔ snake_case）
 const MAP = {
-  sites: { siteId: null, name: 'name', customer: 'customer', phone: 'phone', address: 'address',
-    manager: 'manager', channel: 'channel', status: 'status', inquiryDate: 'inquiry_date',
+  sites: { siteId: null, name: 'name', customer: 'customer', customerId: 'customer_id', phone: 'phone',
+    address: 'address', manager: 'manager', channel: 'channel', status: 'status', inquiryDate: 'inquiry_date',
     surveyDate: 'survey_date', estimateDate: 'estimate_date', estimateAmount: 'estimate_amount',
     contractAmount: 'contract_amount', constructionStart: 'construction_start',
     completionDate: 'completion_date', invoiceDate: 'invoice_date', paymentDueDate: 'payment_due_date',
     paymentDate: 'payment_date', paymentStatus: 'payment_status', nextContact: 'next_contact' },
+  customers: { name: 'name', phone: 'phone', address: 'address', channel: 'channel',
+    inquiryDate: 'inquiry_date', email: 'email', postalCode: 'postal_code',
+    customerType: 'customer_type', memo: 'note' },
   reports: { siteId: 'site_id', date: 'date', worker: 'worker', workContent: 'work_content',
     materials: 'materials', hours: 'hours', problems: 'problems' },
   estimates: { siteId: 'site_id', total: 'total', sell: 'sell', profit: 'profit', margin: 'margin' },

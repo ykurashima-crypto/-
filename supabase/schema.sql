@@ -119,6 +119,15 @@ alter table public.sites add column if not exists invoice_date     date;
 alter table public.sites add column if not exists payment_due_date date;
 alter table public.sites add column if not exists payment_date     date;
 alter table public.sites add column if not exists payment_status   text;
+-- 顧客への紐付け（クライアント採番の文字列IDも保持できるよう text）
+alter table public.sites add column if not exists customer_id      text;
+
+-- 顧客テーブルの拡張（問合せ経路・問合せ日・連絡先など）
+alter table public.customers add column if not exists channel       text;
+alter table public.customers add column if not exists inquiry_date  date;
+alter table public.customers add column if not exists email         text;
+alter table public.customers add column if not exists postal_code   text;
+alter table public.customers add column if not exists customer_type text;
 
 create index if not exists idx_sites_company     on public.sites(company_id, updated_at);
 create index if not exists idx_reports_company   on public.reports(company_id, updated_at);

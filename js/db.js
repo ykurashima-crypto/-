@@ -8,6 +8,7 @@ const defaultData = {
   reports: [], // 日報
   photos: [],  // 写真メタ情報 (実体は IndexedDB)
   estimates: [], // 見積
+  customers: [], // 顧客
 };
 
 function load() {
@@ -32,7 +33,7 @@ export function uid(prefix = 'id') {
   return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 }
 
-export const SYNC_COLLECTIONS = ['sites', 'reports', 'estimates', 'photos'];
+export const SYNC_COLLECTIONS = ['sites', 'reports', 'estimates', 'photos', 'customers'];
 
 // 同期通知（ローカル変更時に共有同期をトリガーするためのフック）
 let onChange = null;
