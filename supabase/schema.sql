@@ -153,6 +153,25 @@ create table if not exists public.surveys (
 );
 create index if not exists idx_surveys_company   on public.surveys(company_id, updated_at);
 
+-- 工程（縦型工程表）
+create table if not exists public.processes (
+  id              uuid primary key default gen_random_uuid(),
+  company_id      uuid not null references public.companies(id) on delete cascade,
+  site_id         uuid references public.sites(id) on delete cascade,
+  process_type    text,
+  scheduled_date  date,
+  completed_date  date,
+  status          text,
+  delay_reason    text,
+  memo            text,
+  sort_order      integer,
+  deleted         boolean not null default false,
+  created_by      uuid default auth.uid(),
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
+);
+create index if not exists idx_processes_company on public.processes(company_id, updated_at);
+
 create index if not exists idx_sites_company     on public.sites(company_id, updated_at);
 create index if not exists idx_reports_company   on public.reports(company_id, updated_at);
 create index if not exists idx_estimates_company on public.estimates(company_id, updated_at);
@@ -172,7 +191,7 @@ end $$;
 do $$
 declare t text;
 begin
-  foreach t in array array['customers','sites','reports','estimates','photos','surveys'] loop
+  foreach t in array array['customers','sites','reports','estimates','photos','surveys','processes'] loop
     execute format('drop trigger if exists trg_touch_%1$s on public.%1$s', t);
     execute format('create trigger trg_touch_%1$s before update on public.%1$s
                     for each row execute function public.touch_updated_at()', t);
@@ -203,6 +222,7 @@ alter table public.reports   enable row level security;
 alter table public.estimates enable row level security;
 alter table public.photos    enable row level security;
 alter table public.surveys   enable row level security;
+alter table public.processes enable row level security;
 
 -- companies: 自社のみ閲覧
 drop policy if exists companies_select on public.companies;
@@ -222,7 +242,7 @@ create policy profiles_update on public.profiles
 do $$
 declare t text;
 begin
-  foreach t in array array['sites','customers','estimates','surveys'] loop
+  foreach t in array array['sites','customers','estimates','surveys','processes'] loop
     execute format('drop policy if exists %1$s_select on public.%1$s', t);
     execute format('create policy %1$s_select on public.%1$s for select
                     using (company_id = public.current_company())', t);

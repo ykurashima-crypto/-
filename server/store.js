@@ -10,7 +10,7 @@ const DATA_DIR = path.join(__dirname, 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 export const BLOB_DIR = path.join(DATA_DIR, 'blobs');
 
-const COLLECTIONS = ['sites', 'reports', 'estimates', 'photos', 'customers', 'surveys'];
+const COLLECTIONS = ['sites', 'reports', 'estimates', 'photos', 'customers', 'surveys', 'processes'];
 
 fs.mkdirSync(BLOB_DIR, { recursive: true });
 

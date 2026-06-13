@@ -11,6 +11,7 @@ import { openCaseForm } from './admin.js';
 import { markInvoiced, markPaid } from '../money.js';
 import { openEstimateDoc, openInvoiceDoc } from '../doc.js';
 import { latestSurvey, surveySummary } from './survey.js';
+import { processProgress } from './process.js';
 
 // ---------- 現場詳細 ----------
 export function renderSite(siteId) {
@@ -85,6 +86,9 @@ export function renderSite(siteId) {
   // 現地調査（記録があれば要約、無ければ作成導線）
   const surveySection = surveyBlock(s);
 
+  // 工程（進捗サマリー or 作成導線）。管理者のみ表示。
+  const processSection = isAdmin ? processBlock(s) : null;
+
   // 管理者向け: 案件の編集・削除
   const adminActions = isAdmin
     ? h('div', { class: 'btn-row' }, [
@@ -112,6 +116,7 @@ export function renderSite(siteId) {
     ]),
     moneyActions,
     surveySection,
+    processSection,
     photoSection,
     reportSection,
     h('div', { class: 'section-title', text: '案件情報' }),
@@ -141,6 +146,22 @@ function surveyBlock(s) {
         ? h('div', { class: 'chip-wrap', style: 'margin-top:8px' }, sum.deterioration.map((d) => h('span', { class: 'chip on', text: d })))
         : h('div', { class: 'sub', text: '劣化の記録なし' }),
       srv.memo ? h('div', { class: 'sub', style: 'margin-top:8px', text: srv.memo.slice(0, 80) }) : null,
+    ]),
+  ]);
+}
+
+// 工程の進捗サマリー or 作成導線。
+function processBlock(s) {
+  const prog = processProgress(s.id);
+  const head = h('div', { class: 'card-row' }, [
+    h('div', { class: 'section-title mt-0', text: '工程' }),
+    h('button', { class: 'btn ghost sm', text: prog ? '工程表を開く' : '＋ 工程表を作る', onclick: () => navigate('process/' + s.id) }),
+  ]);
+  if (!prog) return h('div', {}, [head, h('div', { class: 'empty', text: 'まだ工程表がありません' })]);
+  return h('div', {}, [
+    head,
+    h('div', { class: 'card tap', onclick: () => navigate('process/' + s.id) }, [
+      h('div', { class: 'sub', text: `完了 ${prog.done} / 全 ${prog.total} 工程${prog.done === prog.total ? '（完工 🎉）' : ''}` }),
     ]),
   ]);
 }
