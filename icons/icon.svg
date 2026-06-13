@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <rect width="192" height="192" rx="42" fill="#1f6feb"/>
+  <!-- ローラー刷毛のモチーフ -->
+  <rect x="52" y="46" width="88" height="34" rx="8" fill="#ffffff"/>
+  <rect x="120" y="56" width="14" height="14" rx="3" fill="#1f6feb"/>
+  <rect x="92" y="80" width="8" height="26" fill="#ffffff"/>
+  <rect x="74" y="106" width="44" height="40" rx="8" fill="#ffd34d"/>
+  <rect x="82" y="116" width="28" height="6" rx="3" fill="#1f6feb"/>
+  <rect x="82" y="128" width="28" height="6" rx="3" fill="#1f6feb"/>
+</svg>
