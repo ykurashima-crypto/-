@@ -283,6 +283,8 @@ function kv(k, v) {
 // ---------- 写真撮影 ----------
 export function renderPhotoCapture(siteId) {
   const sites = pickSites();
+  // 今日の現場が1件だけなら、選ばせずに自動でその現場へ紐付ける
+  if (!siteId && sites.length === 1) siteId = sites[0].id;
   if (!siteId && sites.length === 0) {
     return h('div', { class: 'empty', text: '対象の現場がありません。管理者に案件登録を依頼してください。' });
   }
@@ -338,7 +340,7 @@ export function renderPhotoCapture(siteId) {
         await addPhoto({ siteId: s.id, phase, comment: commentInput.value.trim(), file: f });
       }
       commentInput.value = '';
-      toast(`${files.length}枚を保存しました`);
+      toast(`保存しました（${files.length}枚）。続けて撮れます`);
       renderGrid();
       e.target.value = '';
     },
@@ -407,12 +409,9 @@ export function renderReportForm(arg) {
     onchange: (e) => { [...e.target.files].forEach((file) => pending.push({ file, phase: 'during' })); renderPending(); e.target.value = ''; },
   });
 
-  const submit = async () => {
+  // 実際の保存処理（確認後に呼ぶ）
+  const doSubmit = async () => {
     const siteId = siteSel.value;
-    if (!contentInput.value.trim() && !problemInput.value.trim()) {
-      toast('作業内容か問題のどちらかを入力してください');
-      return;
-    }
     localStorage.setItem('nurilog.worker', workerInput.value.trim());
     const report = store.insert('reports', {
       siteId,
@@ -426,10 +425,31 @@ export function renderReportForm(arg) {
     for (const item of pending) {
       await addPhoto({ siteId, reportId: report.id, phase: item.phase, comment: '', file: item.file });
     }
-    // 日報から工程の完了を反映（職人が進捗を更新する経路）
     if (processSel.value) completeProcess(processSel.value, dateInput.value);
-    toast(processSel.value ? '日報を送信し、工程を完了にしました' : '日報を送信しました');
-    navigate('site/' + siteId);
+    clear(document.getElementById('modal-root'));
+    toast('日報を提出しました');
+    // 職人は「今日」へ、管理者は現場詳細へ
+    navigate(localStorage.getItem('nurilog.role') === 'admin' ? 'site/' + siteId : 'worker');
+  };
+
+  // 「この内容で提出しますか？」と確認してから保存する
+  const submit = () => {
+    if (!contentInput.value.trim() && !problemInput.value.trim()) {
+      toast('作業内容か問題のどちらかを入力してください');
+      return;
+    }
+    const line = (k, v) => v ? h('div', { class: 'kv' }, [h('span', { class: 'k', text: k }), h('span', { class: 'v', text: v })]) : null;
+    const proc = processSel.value ? processSel.options[processSel.selectedIndex].text : '';
+    openModal('この内容で提出しますか？', h('div', {}, [
+      line('現場', siteSel.options[siteSel.selectedIndex]?.text),
+      line('今日の作業', contentInput.value.trim()),
+      line('完了した工程', proc),
+      line('使用材料', materialInput.value.trim()),
+      line('問題・追加工事', problemInput.value.trim()),
+      pending.length ? line('写真', `${pending.length}枚`) : null,
+      h('button', { class: 'btn', text: '✅ この内容で提出', onclick: doSubmit }),
+      h('button', { class: 'btn ghost', text: 'もどって直す', onclick: () => clear(document.getElementById('modal-root')) }),
+    ]));
   };
 
   const problemField = h('div', { class: 'field' }, [
@@ -463,7 +483,7 @@ export function renderReportForm(arg) {
 
   return h('div', {}, [
     h('button', { class: 'btn ghost sm', text: '← 戻る', onclick: () => history.back() }),
-    h('h1', { class: 'page-title', text: issueFocus ? '問題・追加工事の報告' : '日報を書く' }),
+    h('h1', { class: 'page-title', text: issueFocus ? '問題・追加工事の報告' : '今日 何しましたか？' }),
     ...fields,
   ]);
 }

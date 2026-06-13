@@ -9,6 +9,8 @@ import { renderCustomers, renderCustomer } from './views/customers.js';
 import { renderSurvey } from './views/survey.js';
 import { renderProcess } from './views/process.js';
 import { renderSchedule } from './views/schedule.js';
+import { renderHoukoku } from './views/houkoku.js';
+import { renderTomorrow } from './views/tomorrow.js';
 import { renderPhotoReport } from './views/photoreport.js';
 import { renderApprove } from './views/extra.js';
 import { renderEstimate } from './views/estimate.js';
@@ -23,11 +25,11 @@ const ROLE_KEY = 'nurilog.role';
 
 const tabsByRole = {
   worker: [
-    { route: 'worker', icon: '🏠', label: 'ホーム' },
-    { route: 'schedule', icon: '📅', label: '予定' },
-    { route: 'photo',  icon: '📷', label: '写真' },
-    { route: 'report', icon: '📝', label: '日報' },
-    { route: 'settings', icon: '🔗', label: '共有' },
+    { route: 'worker',   icon: '🏠', label: '今日' },
+    { route: 'photo',    icon: '📷', label: '写真' },
+    { route: 'report',   icon: '📝', label: '日報' },
+    { route: 'houkoku',  icon: '📣', label: '報告' },
+    { route: 'tomorrow', icon: '📅', label: '明日' },
   ],
   admin: [
     { route: 'admin',     icon: '📊', label: 'ダッシュ' },
@@ -45,6 +47,8 @@ function setRole(role) { localStorage.setItem(ROLE_KEY, role); }
 const routes = {
   worker: () => renderWorkerHome(),
   schedule: () => renderSchedule(),
+  houkoku: () => renderHoukoku(),
+  tomorrow: () => renderTomorrow(),
   photo: (id) => renderPhotoCapture(id),
   report: (id) => renderReportForm(id),
   admin: () => renderAdminHome(),
@@ -135,7 +139,7 @@ function setupRoleSwitch() {
 }
 
 // 同期で他端末の変更が入ったら、閲覧系の画面だけ再描画（入力中フォームは触らない）
-const REFRESH_ROUTES = ['worker', 'schedule', 'admin', 'cases', 'site', 'customers', 'customer', 'survey', 'process'];
+const REFRESH_ROUTES = ['worker', 'schedule', 'tomorrow', 'admin', 'cases', 'site', 'customers', 'customer', 'survey', 'process'];
 function onSynced() {
   const { route } = parseHash();
   if (REFRESH_ROUTES.includes(route)) render();

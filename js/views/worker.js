@@ -1,76 +1,96 @@
-// 職人ホーム =「本日の出陣」。戦国テイストで、今日行く現場・進捗(戦況)を一目で。
-// 金額は一切表示しない。
+// 職人ホーム＝「今日」。今日の現場・やること・必要な写真・注意事項を大きく表示し、
+// 下部に大きな3ボタン（写真/日報/報告）。金額・案件管理・原価は一切出さない。
 import { store } from '../db.js';
-import { h, gauge } from '../ui.js';
-import { activeSites, fmtDate } from '../model.js';
+import { h, toast, clear } from '../ui.js';
+import { activeSites, sitePhotos, todayStr } from '../model.js';
 import { navigate } from '../app.js';
-import { scheduleStatus, currentStep, processProgress } from './process.js';
-
-// 今月の集計（ゲーム的なやる気指標。派生値のみ・保存しない）
-function thisMonthCounts() {
-  const ym = new Date().toISOString().slice(0, 7);
-  const kills = store.all('processes').filter((p) => p.status === 'done' && (p.completedDate || '').startsWith(ym)).length;
-  const shots = store.all('photos').filter((p) => (new Date(p.createdAt).toISOString().slice(0, 7)) === ym).length;
-  return { kills, shots };
-}
+import { siteProcesses, scheduleStatus, completeProcess } from './process.js';
 
 export function renderWorkerHome() {
+  const wrap = h('div', {});
+  const rerender = () => { clear(wrap); build(wrap, rerender); };
+  rerender();
+  return wrap;
+}
+
+function build(wrap, rerender) {
   const sites = activeSites();
-  const { kills, shots } = thisMonthCounts();
 
-  const hero = h('div', { class: 'hero' }, [
-    h('div', { class: 'eyebrow', text: '⚔ 本日の出陣' }),
-    h('h1', { text: sites.length ? `現場 ${sites.length} 箇所` : '今日の現場' }),
-    h('div', { class: 'hero-sub', text: sites.length ? '気をつけて行ってらっしゃい。写真と日報で記録を残そう。' : '稼働中の現場はまだありません。' }),
-    h('div', { class: 'hero-stats' }, [
-      hstat(sites.length, '出陣中'),
-      hstat(kills, '今月の攻略工程'),
-      hstat(shots, '今月の写真'),
-    ]),
-  ]);
+  wrap.append(h('h1', { class: 'page-title', text: '今日の現場' }));
 
-  const tiles = h('div', { class: 'action-grid' }, [
-    actionTile('📷', '写真を撮る', '施工前・中・後', () => navigate('photo')),
-    actionTile('📝', '日報を書く', '作業・工程を記録', () => navigate('report')),
-    actionTile('⚔️', '問題・追加工事', '報告して証拠を残す', () => navigate('report/_issue')),
-    actionTile('📅', '予定を見る', '次に行く現場・工期', () => navigate('schedule')),
-  ]);
+  if (sites.length === 0) {
+    wrap.append(h('div', { class: 'empty' }, [h('span', { class: 'ic', text: '🚧' }), '今日の現場はまだありません']));
+  } else {
+    sites.forEach((s) => wrap.append(todayCard(s, rerender)));
+  }
 
-  const todaySection = h('div', {}, [
-    h('div', { class: 'section-title', text: '今日の現場' }),
-    sites.length === 0
-      ? h('div', { class: 'empty' }, [h('span', { class: 'ic', text: '🚧' }), '稼働中の現場がありません'])
-      : h('div', {}, sites.map(siteCard)),
-  ]);
-
-  return h('div', {}, [hero, tiles, todaySection]);
+  // 下部の大きな3ボタン
+  wrap.append(h('div', { class: 'big-actions' }, [
+    bigBtn('📷', '写真を撮る', () => navigate('photo')),
+    bigBtn('📝', '日報を書く', () => navigate('report')),
+    bigBtn('📣', '困ったを報告', () => navigate('houkoku')),
+  ]));
 }
 
-function hstat(n, l) {
-  return h('div', { class: 'hstat' }, [h('div', { class: 'n', text: String(n) }), h('div', { class: 'l', text: l })]);
-}
-
-function actionTile(icon, label, desc, onclick) {
-  return h('button', { class: 'action-tile', onclick }, [
-    h('span', { class: 'ic', text: icon }),
-    h('span', { class: 'label', text: label }),
-    h('span', { class: 'desc', text: desc }),
+function bigBtn(icon, label, onclick) {
+  return h('button', { class: 'big-btn', onclick }, [
+    h('span', { class: 'bb-ic', text: icon }),
+    h('span', { class: 'bb-l', text: label }),
   ]);
 }
 
-function siteCard(s) {
+function todayCard(s, rerender) {
   const ss = scheduleStatus(s.id);
-  const cur = currentStep(s.id);
-  const prog = processProgress(s.id);
-  const time = (s.workStart || s.workEnd) ? `🕒 ${s.workStart || '—'}〜${s.workEnd || '—'}　` : '';
-  return h('div', { class: 'card tap', onclick: () => navigate('site/' + s.id) }, [
-    h('div', { class: 'card-row' }, [
-      h('h3', { text: s.name }),
-      ss ? h('span', { class: 'pill ' + ss.cls, text: ss.label }) : null,
+  const procs = siteProcesses(s.id);
+  const todo = procs.filter((p) => p.status !== 'done');
+  const photos = sitePhotos(s.id);
+  const hasBefore = photos.some((p) => p.phase === 'before');
+  const hasAfter = photos.some((p) => p.phase === 'after');
+
+  // 今日やること＝未完了の工程をチェックリストに（チェックで完了）
+  const checklist = h('div', {}, todo.slice(0, 6).map((p) => h('label', { class: 'check-row big' }, [
+    h('input', {
+      type: 'checkbox',
+      onchange: () => { completeProcess(p.id, todayStr()); toast('「' + p.processType + '」を完了にしました'); rerender(); },
+    }),
+    h('span', { text: p.processType }),
+  ])));
+
+  return h('div', { class: 'card today-card' }, [
+    h('div', { class: 'today-name', text: s.name }),
+    ss ? h('span', { class: 'pill ' + ss.cls, text: ss.label }) : null,
+    h('div', { class: 'today-rows' }, [
+      bigRow('🕒 集合', (s.workStart || s.workEnd) ? `${s.workStart || '—'}〜${s.workEnd || '—'}` : '時間未設定'),
+      bigRow('👷 担当', s.manager || '—'),
+      bigRow('📍 住所', s.address || '住所未登録'),
     ]),
-    h('div', { class: 'sub', text: `📍 ${s.address || '住所未登録'}` }),
-    h('div', { class: 'sub', text: `${time}担当: ${s.manager || '—'}` }),
-    cur ? h('div', { class: 'sub', text: `▶ いまの工程: ${cur.processType}（予定 ${fmtDate(cur.scheduledDate)}）` }) : null,
-    prog ? gauge(prog.done, prog.total) : null,
+    s.address ? h('a', {
+      class: 'btn secondary', target: '_blank', rel: 'noopener',
+      href: 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(s.address),
+      text: '🗺 地図を開く',
+    }) : null,
+
+    h('div', { class: 'section-title', text: '今日やること' }),
+    todo.length === 0
+      ? h('div', { class: 'warn-box ok', text: '✅ 工程はすべて完了しています' })
+      : checklist,
+    h('div', { class: 'check-row big' }, [
+      h('span', { text: (hasBefore ? '✅' : '⬜') + ' 施工前の写真' }),
+    ]),
+    h('div', { class: 'check-row big' }, [
+      h('span', { text: (hasAfter ? '✅' : '⬜') + ' 施工後の写真' }),
+    ]),
+
+    s.memo ? h('div', {}, [
+      h('div', { class: 'section-title', text: '注意・約束' }),
+      h('div', { class: 'warn-box', style: 'background:rgba(224,169,59,.12);color:#e6d3ab;border:1px solid rgba(224,169,59,.3)', text: s.memo }),
+    ]) : null,
+  ]);
+}
+
+function bigRow(k, v) {
+  return h('div', { class: 'today-row' }, [
+    h('span', { class: 'tr-k', text: k }),
+    h('span', { class: 'tr-v', text: v }),
   ]);
 }
