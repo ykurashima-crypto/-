@@ -7,7 +7,9 @@ import { renderAdminHome, renderCases } from './views/admin.js';
 import { renderSite, renderReportForm, renderPhotoCapture } from './views/site.js';
 import { renderEstimate } from './views/estimate.js';
 import { renderSettings } from './views/settings.js';
+import { renderLogin } from './views/login.js';
 import { initSync, onSyncEvent, syncState, syncNow } from './sync.js';
+import { cloudEnabled, initCloud, cloudState, currentRole, onCloud, signOut } from './cloud.js';
 
 const ROLE_KEY = 'nurilog.role';
 
@@ -62,8 +64,19 @@ function renderTabbar(activeRoute) {
 }
 
 function render() {
-  const { route, arg } = parseHash();
   const view = document.getElementById('view');
+  const tabbar = document.getElementById('tabbar');
+
+  // 本番(クラウド)モードで未ログインならログイン画面のみ表示
+  if (cloudEnabled() && !cloudState().signedIn) {
+    clear(view);
+    tabbar.style.display = 'none';
+    view.append(renderLogin(() => { applyCloudRole(); render(); }));
+    return;
+  }
+  tabbar.style.display = '';
+
+  const { route, arg } = parseHash();
   const fn = routes[route] || routes[getRole() === 'admin' ? 'admin' : 'worker'];
   clear(view);
   const node = fn(arg);
@@ -102,6 +115,15 @@ function onSynced() {
 function updateSyncBadge() {
   const el = document.getElementById('syncBadge');
   if (!el) return;
+  // 本番(クラウド)モード
+  if (cloudEnabled()) {
+    const c = cloudState();
+    if (!c.signedIn) { el.hidden = true; return; }
+    el.hidden = false;
+    el.className = 'sync-badge on';
+    el.textContent = 'クラウド';
+    return;
+  }
   const s = syncState();
   if (!s.enabled) { el.hidden = true; return; }
   el.hidden = false;
@@ -109,14 +131,33 @@ function updateSyncBadge() {
   el.textContent = s.lastError ? '同期エラー' : s.syncing ? '同期中…' : '共有中';
 }
 
-function boot() {
+// クラウドモード: 役割はアカウント(プロフィール)から決まる。手動の役割切替は隠す。
+function applyCloudRole() {
+  const r = currentRole();
+  if (r) setRole(r);
+  // クラウドモードでは役割はアカウント由来。手動切替は常に隠す。
+  const sw = document.getElementById('roleSwitch');
+  if (sw) sw.style.display = cloudEnabled() ? 'none' : '';
+}
+
+async function boot() {
   seedIfEmpty();
   setupRoleSwitch();
-  initSync();
   onSyncEvent(updateSyncBadge);
   updateSyncBadge();
   document.addEventListener('nurilog:synced', onSynced);
   window.addEventListener('hashchange', render);
+
+  if (cloudEnabled()) {
+    // 本番モード: Supabase認証。役割はアカウント由来。デモ用のチーム同期は使わない。
+    try { await initCloud(); } catch (e) { console.warn('クラウド初期化に失敗', e); }
+    onCloud(() => { applyCloudRole(); updateSyncBadge(); render(); });
+    applyCloudRole();
+  } else {
+    // デモモード: 端末内保存 ＋ 任意のチームコード共有
+    initSync();
+  }
+
   if (!location.hash) navigate(getRole() === 'admin' ? 'admin' : 'worker');
   render();
 

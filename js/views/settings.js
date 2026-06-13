@@ -5,8 +5,30 @@ import {
   getConfig, setConfig, isEnabled, syncNow, ping, syncState,
   onSyncEvent, resetCursorsForFullSync,
 } from '../sync.js';
+import { cloudEnabled, cloudState, signOut, cloudSync } from '../cloud.js';
 
 export function renderSettings() {
+  // 本番(クラウド)モード: アカウント情報とログアウトを表示（チームコード共有は使わない）
+  if (cloudEnabled()) {
+    const s = cloudState();
+    const roleLabel = s.role === 'admin' ? '管理者' : s.role === 'worker' ? '職人' : '未割当';
+    return h('div', {}, [
+      h('h1', { class: 'page-title', text: 'アカウント' }),
+      h('div', { class: 'card' }, [
+        kvRow('ログイン', s.email || '—'),
+        kvRow('役割', roleLabel),
+        kvRow('会社ID', s.companyId || '（管理者に割当を依頼）'),
+        kvRow('保存先', 'クラウド（Supabase）'),
+      ]),
+      h('div', { class: 'btn-row' }, [
+        h('button', { class: 'btn secondary', text: 'いま同期する', onclick: async () => { await cloudSync(); toast('同期しました'); } }),
+        h('button', { class: 'btn ghost', text: 'ログアウト', onclick: async () => { await signOut(); toast('ログアウトしました'); } }),
+      ]),
+      !s.companyId ? h('div', { class: 'warn-box bad', text: '会社が未割当です。管理者がSupabaseでprofilesにcompanyIdを設定すると、データが表示されます。' }) : null,
+      h('p', { class: 'sub', text: 'データは会社単位でクラウド保存され、別の端末からも同じ内容を確認できます。' }),
+    ]);
+  }
+
   const cfg = getConfig();
 
   const serverInput = h('input', { type: 'text', placeholder: '空欄=このサーバー（同一オリジン）', value: cfg.serverUrl || '' });
@@ -85,4 +107,8 @@ function statCard(num, lbl) {
     h('div', { class: 'num', text: String(num) }),
     h('div', { class: 'lbl', text: lbl }),
   ]);
+}
+
+function kvRow(k, v) {
+  return h('div', { class: 'kv' }, [h('span', { class: 'k', text: k }), h('span', { class: 'v', text: v })]);
 }
