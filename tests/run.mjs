@@ -93,6 +93,32 @@ test('金額サマリー（未請求/入金待ち）', () => {
   assert.equal(s.awaitingPayment, 720000 + 500000);
 });
 
+group('ホーム 今日やること');
+test('tasks は money→work 優先で統合され、各タスクに action がある', () => {
+  reset();
+  store.insert('sites', { name: '完工', status: 'done', estimateAmount: 100 });
+  store.insert('sites', { name: '今日現調', status: 'survey', surveyDate: '2026-06-13' });
+  const { tasks } = computeAlerts(Date.parse('2026-06-13T09:00:00'));
+  assert.ok(tasks.length >= 2);
+  assert.equal(tasks[0].severity, 'money'); // お金が先頭
+  assert.ok(tasks.every((t) => t.action)); // 全タスクに行動ボタン種別
+  assert.ok(tasks.some((t) => t.action === 'survey' && t.title.includes('現地調査')));
+});
+test('見積放置は3日でリマインド（2日では出ない）', () => {
+  reset();
+  store.insert('sites', { id: 'q3', name: '3日', status: 'quoted', estimateDate: '2026-06-10', estimateAmount: 1 });
+  store.insert('sites', { id: 'q2', name: '2日', status: 'quoted', estimateDate: '2026-06-11', estimateAmount: 1 });
+  const { money } = computeAlerts(Date.parse('2026-06-13T09:00:00'));
+  assert.ok(money.some((m) => m.siteId === 'q3' && m.action === 'call'));
+  assert.ok(!money.some((m) => m.siteId === 'q2'));
+});
+test('連絡予定日が今日 → call タスク', () => {
+  reset();
+  store.insert('sites', { name: '今日連絡', status: 'follow', nextContact: '2026-06-13' });
+  const { work } = computeAlerts(Date.parse('2026-06-13T09:00:00'));
+  assert.ok(work.some((w) => w.action === 'call' && w.title.includes('今日が連絡')));
+});
+
 group('money ヘルパー');
 test('addDays は日本式日付を返す', () => assert.equal(addDays('2026-06-13', 30), '2026-07-13'));
 test('billableAmount は契約額優先', () => {
