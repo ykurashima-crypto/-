@@ -10,6 +10,7 @@ import { navigate } from '../app.js';
 import { openCaseForm } from './admin.js';
 import { markInvoiced, markPaid } from '../money.js';
 import { openEstimateDoc, openInvoiceDoc } from '../doc.js';
+import { latestSurvey, surveySummary } from './survey.js';
 
 // ---------- 現場詳細 ----------
 export function renderSite(siteId) {
@@ -81,6 +82,9 @@ export function renderSite(siteId) {
   // 書類PDF（管理者）。見積はこの現場の最新見積、無ければ見積金額の一式から生成。
   const docButtons = isAdmin ? documentBlock(s) : null;
 
+  // 現地調査（記録があれば要約、無ければ作成導線）
+  const surveySection = surveyBlock(s);
+
   // 管理者向け: 案件の編集・削除
   const adminActions = isAdmin
     ? h('div', { class: 'btn-row' }, [
@@ -107,6 +111,7 @@ export function renderSite(siteId) {
       h('button', { class: 'btn secondary', text: '📝 日報', onclick: () => navigate('report/' + s.id) }),
     ]),
     moneyActions,
+    surveySection,
     photoSection,
     reportSection,
     h('div', { class: 'section-title', text: '案件情報' }),
@@ -114,6 +119,29 @@ export function renderSite(siteId) {
     estimateBtn,
     docButtons,
     adminActions,
+  ]);
+}
+
+// 現地調査の要約 or 作成ボタン。
+function surveyBlock(s) {
+  const srv = latestSurvey(s.id);
+  const head = h('div', { class: 'card-row' }, [
+    h('div', { class: 'section-title mt-0', text: '現地調査' }),
+    h('button', { class: 'btn ghost sm', text: srv ? '✏️ 編集' : '＋ 調査する', onclick: () => navigate('survey/' + s.id) }),
+  ]);
+  if (!srv) {
+    return h('div', {}, [head, h('div', { class: 'empty', text: 'まだ調査記録がありません' })]);
+  }
+  const sum = surveySummary(srv);
+  return h('div', {}, [
+    head,
+    h('div', { class: 'card tap', onclick: () => navigate('survey/' + s.id) }, [
+      h('div', { class: 'sub', text: `${sum.head}${sum.date ? '　調査日 ' + sum.date : ''}` }),
+      sum.deterioration.length
+        ? h('div', { class: 'chip-wrap', style: 'margin-top:8px' }, sum.deterioration.map((d) => h('span', { class: 'chip on', text: d })))
+        : h('div', { class: 'sub', text: '劣化の記録なし' }),
+      srv.memo ? h('div', { class: 'sub', style: 'margin-top:8px', text: srv.memo.slice(0, 80) }) : null,
+    ]),
   ]);
 }
 

@@ -6,6 +6,7 @@ import { renderWorkerHome } from './views/worker.js';
 import { renderAdminHome, renderCases } from './views/admin.js';
 import { renderSite, renderReportForm, renderPhotoCapture } from './views/site.js';
 import { renderCustomers, renderCustomer } from './views/customers.js';
+import { renderSurvey } from './views/survey.js';
 import { renderEstimate } from './views/estimate.js';
 import { renderSettings } from './views/settings.js';
 import { renderLogin } from './views/login.js';
@@ -42,6 +43,7 @@ const routes = {
   cases: () => renderCases(),
   customers: () => renderCustomers(),
   customer: (id) => renderCustomer(id),
+  survey: (id) => renderSurvey(id),
   estimate: (id) => renderEstimate(id),
   settings: () => renderSettings(),
   site: (id) => renderSite(id),
@@ -110,7 +112,7 @@ function setupRoleSwitch() {
 }
 
 // 同期で他端末の変更が入ったら、閲覧系の画面だけ再描画（入力中フォームは触らない）
-const REFRESH_ROUTES = ['worker', 'admin', 'cases', 'site', 'customers', 'customer'];
+const REFRESH_ROUTES = ['worker', 'admin', 'cases', 'site', 'customers', 'customer', 'survey'];
 function onSynced() {
   const { route } = parseHash();
   if (REFRESH_ROUTES.includes(route)) render();

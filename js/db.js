@@ -9,6 +9,7 @@ const defaultData = {
   photos: [],  // 写真メタ情報 (実体は IndexedDB)
   estimates: [], // 見積
   customers: [], // 顧客
+  surveys: [],   // 現地調査
 };
 
 function load() {
@@ -45,7 +46,7 @@ export function uid(_prefix = 'id') {
   return `${hex.slice(0, 4).join('')}-${hex.slice(4, 6).join('')}-${hex.slice(6, 8).join('')}-${hex.slice(8, 10).join('')}-${hex.slice(10, 16).join('')}`;
 }
 
-export const SYNC_COLLECTIONS = ['sites', 'reports', 'estimates', 'photos', 'customers'];
+export const SYNC_COLLECTIONS = ['sites', 'reports', 'estimates', 'photos', 'customers', 'surveys'];
 
 // 同期通知（ローカル変更時に共有同期をトリガーするためのフック）
 let onChange = null;

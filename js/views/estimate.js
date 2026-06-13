@@ -7,6 +7,7 @@ import { yen, todayStr } from '../model.js';
 import { navigate } from '../app.js';
 import { openEstimateDoc } from '../doc.js';
 import { addDays } from '../money.js';
+import { latestSurvey } from './survey.js';
 
 const MIN_MARGIN = 0.25;        // 最低粗利率 25%
 const MAX_DISCOUNT_RATE = 0.1;  // 値引きは小計の10%まで
@@ -36,6 +37,9 @@ function estimateNumber() {
 
 export function renderEstimate(siteId) {
   const site = siteId ? store.get('sites', siteId) : null;
+  // 現地調査があれば塗装面積を原価計算に引き継ぐ
+  const survey = site ? latestSurvey(site.id) : null;
+  const prefillArea = survey?.paintingArea ?? '';
 
   // ---- 明細(売価)状態 ----
   let rows = []; // {name, qty, unit, unitPrice}
@@ -200,7 +204,7 @@ export function renderEstimate(siteId) {
 
     h('div', { class: 'section-title', text: '原価（粗利チェック・社内用／PDFには出ません）' }),
     h('div', { class: 'grid-2' }, [
-      h('div', { class: 'field' }, [h('label', { text: '塗装面積（㎡）' }), f.area = h('input', { type: 'number', min: '0', placeholder: '例）180', oninput: recalc })]),
+      h('div', { class: 'field' }, [h('label', { text: '塗装面積（㎡）' + (prefillArea ? '・現調より' : '') }), f.area = h('input', { type: 'number', min: '0', placeholder: '例）180', value: prefillArea, oninput: recalc })]),
       h('div', { class: 'field' }, [h('label', { text: '塗料グレード' }), paintSel]),
     ]),
     h('div', { class: 'grid-2' }, [num('scaffold', '足場代', '円'), num('wash', '高圧洗浄', '円')]),
