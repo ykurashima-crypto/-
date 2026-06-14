@@ -24,6 +24,15 @@ export function h(tag, attrs = {}, children = []) {
 
 export function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
 
+// テキストをクリップボードへコピー（LINE/メールへ貼り付ける用）。
+export async function copyText(t) {
+  try {
+    if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(t); }
+    else { const ta = h('textarea'); ta.value = t; document.body.append(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+    toast('コピーしました。LINE/メールに貼り付けできます');
+  } catch { toast('コピーできませんでした'); }
+}
+
 // 画面内の操作案内（一度×で消すと再表示しない）。dismiss済みなら null を返す。
 export function hintBanner(key, text) {
   const k = 'nurilog.hint.' + key;

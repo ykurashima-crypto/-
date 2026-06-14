@@ -201,6 +201,40 @@ test('upcomingSteps は未完了を予定日順に', () => {
   assert.equal(up[0].processType, '下塗り');
 });
 
+group('AI事務員（無料の下書き）');
+test('連絡文にお客様名・屋号・金額が差し込まれる', async () => {
+  const { setCompany } = await import(J('js/company.js'));
+  const ai = await import(J('js/ai.js'));
+  setCompany({ name: '伊藤塗装', phone: '090-1111-2222' });
+  const site = { name: '田中様邸 外壁塗装', customer: '田中 健一', contractAmount: 720000, paymentDueDate: '2026-05-31' };
+  const f = ai.draftFollowup(site);
+  assert.ok(f.includes('田中 健一 様') && f.includes('伊藤塗装') && f.includes('田中様邸 外壁塗装'));
+  const p = ai.draftPaymentReminder(site);
+  assert.ok(p.includes('¥720,000'));
+  const c = ai.draftCompletion(site);
+  assert.ok(c.includes('ありがとう') && c.includes('¥720,000'));
+});
+test('contactList が状態ごとに文面タイプを割り当てる', async () => {
+  const ai = await import(J('js/ai.js'));
+  reset();
+  store.insert('sites', { id: 'd', name: '完工', status: 'done', contractAmount: 1 });
+  store.insert('sites', { id: 'b', name: '滞納', status: 'billed', paymentDueDate: '2026-05-31', contractAmount: 1 });
+  store.insert('sites', { id: 'q', name: '追客', status: 'quoted', estimateDate: '2026-06-01', estimateAmount: 1 });
+  const l = ai.contactList('2026-06-13');
+  assert.equal(l.find((x) => x.site.id === 'd').type, 'completion');
+  assert.equal(l.find((x) => x.site.id === 'b').type, 'payment');
+  assert.equal(l.find((x) => x.site.id === 'q').type, 'followup');
+});
+test('日報の要約が作業と問題をまとめる', async () => {
+  const ai = await import(J('js/ai.js'));
+  const reports = [
+    { date: '2026-06-12', workContent: '外壁 下塗り', problems: '' },
+    { date: '2026-06-13', workContent: '中塗り', problems: '破風に腐食' },
+  ];
+  const s = ai.summarizeReports(reports);
+  assert.ok(s.includes('作業の記録') && s.includes('中塗り') && s.includes('破風に腐食'));
+});
+
 group('操作案内（ヒント）');
 test('消したヒントは再表示しない（localStorageで記憶）', async () => {
   const { hintBanner } = await import(J('js/ui.js'));

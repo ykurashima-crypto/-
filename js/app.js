@@ -13,6 +13,7 @@ import { renderHoukoku } from './views/houkoku.js';
 import { renderTomorrow } from './views/tomorrow.js';
 import { renderPhotoReport } from './views/photoreport.js';
 import { renderApprove } from './views/extra.js';
+import { renderAi } from './views/ai.js';
 import { renderEstimate } from './views/estimate.js';
 import { renderSettings } from './views/settings.js';
 import { renderLogin } from './views/login.js';
@@ -34,6 +35,7 @@ const tabsByRole = {
   admin: [
     { route: 'admin',     icon: '📊', label: 'ダッシュ' },
     { route: 'cases',     icon: '📋', label: '案件' },
+    { route: 'ai',        icon: '🤖', label: 'AI事務' },
     { route: 'customers', icon: '👤', label: '顧客' },
     { route: 'estimate',  icon: '🧮', label: '見積' },
     { route: 'settings',  icon: '🔗', label: '共有' },
@@ -59,6 +61,7 @@ const routes = {
   process: (id) => renderProcess(id),
   photodoc: (id) => renderPhotoReport(id),
   approve: (id) => renderApprove(id),
+  ai: () => renderAi(),
   estimate: (id) => renderEstimate(id),
   settings: () => renderSettings(),
   site: (id) => renderSite(id),
