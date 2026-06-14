@@ -1,5 +1,5 @@
 // シンプルなオフラインキャッシュ。アプリ資産をキャッシュし、ネット不通でも起動できるようにする。
-const CACHE = 'nurilog-v23';
+const CACHE = 'nurilog-v24';
 const ASSETS = [
   './',
   './index.html',

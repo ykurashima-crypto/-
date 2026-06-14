@@ -21,17 +21,23 @@ export function renderAdminHome() {
   return wrap;
 }
 
+function greeting() {
+  const hr = new Date().getHours();
+  return hr < 4 ? 'こんばんは' : hr < 11 ? 'おはようございます' : hr < 18 ? 'お疲れさまです' : 'こんばんは';
+}
+
 function buildHome(wrap, rerender) {
   const active = activeSites();
   const { tasks, money } = computeAlerts();
   const sum = moneySummary();
+  const visible = tasks.filter((t) => !isSnoozed(t)); // 「後で通知」で今日は隠したものを除く
 
   // 最上部 ＝「今日やること」。お金の漏れ→仕事の漏れの優先順で、各タスクに行動ボタン付き。
   const taskSection = h('div', {}, [
-    h('div', { class: 'section-title', text: '🔥 今日やること' }),
-    tasks.length === 0
+    h('div', { class: 'section-title', text: '今日やること' }),
+    visible.length === 0
       ? h('div', { class: 'empty' }, [h('span', { class: 'ic', text: '🍵' }), 'やることはありません。お疲れさまです 👍'])
-      : h('div', {}, tasks.map((a) => alertCard(a, rerender))),
+      : h('div', {}, visible.map((a) => alertCard(a, rerender))),
   ]);
 
   // お金まわりのサマリー（控えめに下部へ）
@@ -51,19 +57,28 @@ function buildHome(wrap, rerender) {
 
   const hint = hintBanner('home', '赤いカードは「お金の漏れ」。各カードのボタンで、その場で片付けられます。困ったら「＋新規」から3つ入れるだけで案件を登録できます。');
   wrap.append(
-    h('h1', { class: 'page-title', text: '今日やること' }),
+    h('div', { class: 'greet' }, [
+      h('div', { class: 'hello', text: greeting() }),
+      h('div', { class: 'todo-count', html: `今日やること <b>${visible.length}</b> 件` }),
+    ]),
     hint || h('span', { class: 'hidden' }),
     h('button', { class: 'btn', text: '＋ 新規の案件を登録', onclick: () => openCaseForm(null, rerender) }),
     taskSection,
     todaySection,
-    h('div', { class: 'section-title', text: '💰 お金の状況' }),
+    h('div', { class: 'section-title', text: 'お金の状況' }),
     stats,
   );
 }
 
-// アラート1件のカード。本文タップで現場へ。種別に応じてワンタップ解決ボタンを出す。
+// 「後で通知」: その案件のタスクを今日だけ隠す（翌日また表示）。
+function snoozeKey(t) { return 'nurilog.snooze.' + t.siteId + '.' + (t.action || '') + '.' + (t.title || '').slice(0, 12); }
+function isSnoozed(t) { return localStorage.getItem(snoozeKey(t)) === todayStr(); }
+function snoozeTask(t) { localStorage.setItem(snoozeKey(t), todayStr()); }
+
+// アラート1件のカード。本文タップで現場へ。種別に応じてワンタップ解決ボタン＋「後で通知」。
 function alertCard(a, onResolved) {
   const action = alertAction(a, onResolved);
+  const later = h('button', { class: 'btn ghost sm', text: '後で通知', onclick: () => { snoozeTask(a); toast('後でまたお知らせします'); onResolved && onResolved(); } });
   return h('div', { class: 'card alert-' + a.severity }, [
     h('div', { class: 'alert-row tap', onclick: () => navigate('site/' + a.siteId) }, [
       h('span', { class: 'alert-ic', text: a.icon }),
@@ -73,7 +88,7 @@ function alertCard(a, onResolved) {
         h('div', { class: 'alert-detail', text: a.detail }),
       ]),
     ]),
-    action ? h('div', { class: 'alert-actions' }, [action]) : null,
+    h('div', { class: 'alert-actions' }, [h('div', { class: 'btn-row' }, [action, later].filter(Boolean))]),
   ]);
 }
 

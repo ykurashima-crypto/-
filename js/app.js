@@ -1,9 +1,9 @@
 // アプリ本体: ロール切替・ハッシュルーター・タブバー制御。
 import { store } from './db.js';
 import { seedIfEmpty } from './model.js';
-import { clear } from './ui.js';
+import { clear, h, openModal } from './ui.js';
 import { renderWorkerHome } from './views/worker.js';
-import { renderAdminHome, renderCases } from './views/admin.js';
+import { renderAdminHome, renderCases, openCaseForm } from './views/admin.js';
 import { renderSite, renderReportForm, renderPhotoCapture } from './views/site.js';
 import { renderCustomers, renderCustomer } from './views/customers.js';
 import { renderSurvey } from './views/survey.js';
@@ -78,6 +78,29 @@ function parseHash() {
 
 export function navigate(path) { location.hash = '#/' + path; }
 
+// ── AI事務員 フローティングボタン（管理者モードのみ）──
+let fabEl = null;
+function showFab(on) {
+  if (!fabEl) {
+    fabEl = h('button', { class: 'ai-fab', text: '🤖 AI事務員', onclick: openAiMenu });
+    document.body.append(fabEl);
+  }
+  fabEl.style.display = on ? '' : 'none';
+}
+function aiItem(label, fn) {
+  return h('button', { class: 'btn secondary', style: 'margin-bottom:10px', text: label, onclick: () => { clear(document.getElementById('modal-root')); fn(); } });
+}
+function openAiMenu() {
+  openModal('何をしますか？', h('div', {}, [
+    h('p', { class: 'sub mt-0', text: 'よく使う操作です。重要な処理は確認画面が出ます。' }),
+    aiItem('🧾 案件・現場を登録する', () => openCaseForm(null, () => render())),
+    aiItem('🧮 見積を作る', () => navigate('estimate')),
+    aiItem('📣 顧客へ連絡（文面づくり）', () => navigate('ai')),
+    aiItem('📝 日報を作る', () => navigate('report')),
+    aiItem('💴 請求・入金を確認する', () => navigate('admin')),
+  ]));
+}
+
 function renderTabbar(activeRoute) {
   const bar = document.getElementById('tabbar');
   clear(bar);
@@ -98,22 +121,23 @@ function render() {
   if (cloudEnabled()) {
     const c = cloudState();
     if (!c.signedIn) {
-      clear(view); tabbar.style.display = 'none';
+      clear(view); tabbar.style.display = 'none'; showFab(false);
       view.append(renderLogin(() => { applyCloudRole(); render(); }));
       return;
     }
     if (!c.companyId) {
-      clear(view); tabbar.style.display = 'none';
+      clear(view); tabbar.style.display = 'none'; showFab(false);
       view.append(renderCloudOnboarding(() => { applyCloudRole(); render(); }));
       return;
     }
   } else if (!isOnboarded()) {
     // デモ(端末内保存)モード: 初回セットアップ
-    clear(view); tabbar.style.display = 'none';
+    clear(view); tabbar.style.display = 'none'; showFab(false);
     view.append(renderOnboarding(() => render()));
     return;
   }
   tabbar.style.display = '';
+  showFab(uiMode(getRole()) === 'admin'); // AI事務員は管理者モードのみ
 
   const { route, arg } = parseHash();
   const fn = routes[route] || routes[uiMode(getRole()) === 'admin' ? 'admin' : 'worker'];

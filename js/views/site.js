@@ -354,7 +354,11 @@ export function renderPhotoCapture(siteId) {
     h('div', { class: 'field' }, [h('label', { text: '工程（種類）' }), phaseBtns]),
     h('div', { class: 'field' }, [h('label', { text: 'コメント' }), commentInput]),
     fileInput,
-    h('button', { class: 'btn', text: '📷 撮影 / 写真を選ぶ', onclick: () => fileInput.click() }),
+    h('button', { class: 'btn', text: '📷 写真を撮る', onclick: () => fileInput.click() }),
+    h('div', { class: 'btn-row' }, [
+      h('button', { class: 'btn secondary', text: '日報を書く', onclick: () => navigate('report/' + s.id) }),
+      h('button', { class: 'btn ghost', text: '完了する', onclick: () => navigate(localStorage.getItem('nurilog.role') === 'admin' ? 'site/' + s.id : 'worker') }),
+    ]),
     h('div', { class: 'section-title', text: `この現場の写真（${sitePhotos(s.id).length}）` }),
     grid,
   ]);

@@ -58,9 +58,25 @@ function todayCard(s, rerender) {
     h('span', { text: p.processType }),
   ])));
 
+  // 作業開始/終了（その日の打刻。端末内に保存）
+  const wk = 'nurilog.attend.' + s.id + '.' + todayStr();
+  let att = {};
+  try { att = JSON.parse(localStorage.getItem(wk)) || {}; } catch { att = {}; }
+  const nowHM = () => { const d = new Date(); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+  const setAtt = (k) => { att[k] = nowHM(); localStorage.setItem(wk, JSON.stringify(att)); toast(k === 'start' ? `作業開始 ${att.start}` : `作業終了 ${att.end}`); rerender(); };
+  const attendRow = h('div', { class: 'big-actions two' }, [
+    att.start
+      ? h('button', { class: 'big-btn wide', disabled: 'disabled' }, [h('span', { class: 'bb-ic', text: '✅' }), h('span', { class: 'bb-l', text: `開始 ${att.start}` })])
+      : h('button', { class: 'big-btn wide primary', onclick: () => setAtt('start') }, [h('span', { class: 'bb-ic', text: '▶' }), h('span', { class: 'bb-l', text: '作業開始' })]),
+    att.end
+      ? h('button', { class: 'big-btn wide', disabled: 'disabled' }, [h('span', { class: 'bb-ic', text: '🏁' }), h('span', { class: 'bb-l', text: `終了 ${att.end}` })])
+      : h('button', { class: 'big-btn wide', onclick: () => setAtt('end') }, [h('span', { class: 'bb-ic', text: '⏹' }), h('span', { class: 'bb-l', text: '作業終了' })]),
+  ]);
+
   return h('div', { class: 'card today-card' }, [
     h('div', { class: 'today-name', text: s.name }),
     ss ? h('span', { class: 'pill ' + ss.cls, text: ss.label }) : null,
+    attendRow,
     h('div', { class: 'today-rows' }, [
       bigRow('🕒 集合', (s.workStart || s.workEnd) ? `${s.workStart || '—'}〜${s.workEnd || '—'}` : '時間未設定'),
       bigRow('👷 担当', s.manager || '—'),
