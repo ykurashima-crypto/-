@@ -24,6 +24,27 @@ export function h(tag, attrs = {}, children = []) {
 
 export function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
 
+// 画面内の操作案内（一度×で消すと再表示しない）。dismiss済みなら null を返す。
+export function hintBanner(key, text) {
+  const k = 'nurilog.hint.' + key;
+  if (localStorage.getItem(k) === '1') return null;
+  const el = h('div', { class: 'hint-banner' }, [
+    h('span', { class: 'hb-ic', text: '💡' }),
+    h('span', { class: 'hb-text', text }),
+    h('button', { class: 'hb-close', text: '×', title: '今後表示しない', onclick: () => { localStorage.setItem(k, '1'); el.remove(); } }),
+  ]);
+  return el;
+}
+
+// すべてのヒントを再表示できるようにする（設定の「操作ガイドをもう一度」）。
+export function resetHints() {
+  if (typeof localStorage.key !== 'function') return;
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith('nurilog.hint.')) localStorage.removeItem(key);
+  }
+}
+
 // 戦況ゲージ（工程の進捗バー）。done/total から割合を描く。
 export function gauge(done, total, label = '戦況') {
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;

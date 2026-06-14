@@ -9,6 +9,7 @@ import { cloudEnabled, cloudState, signOut, cloudSync } from '../cloud.js';
 import { getCompany, setCompany, planLabel } from '../company.js';
 import { downscaleToBlob } from '../model.js';
 import { downloadBackup, importBackup, validateBackup } from '../backup.js';
+import { resetHints } from '../ui.js';
 
 // データのバックアップ／復元カード。
 function backupCard() {
@@ -42,6 +43,9 @@ function backupCard() {
       h('button', { class: 'btn ghost', text: '♻️ バックアップから復元', onclick: () => fileInput.click() }),
       fileInput,
       h('div', { class: 'hint', text: 'クラウド利用時はSupabase側にも保存されます。定期的にこのファイル保存もおすすめします。' }),
+    ]),
+    h('div', { class: 'card' }, [
+      h('button', { class: 'btn ghost', text: '💡 操作ガイドをもう一度表示する', onclick: () => { resetHints(); toast('各画面のヒントを再表示します'); } }),
     ]),
   ]);
 }

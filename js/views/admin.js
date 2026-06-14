@@ -1,6 +1,6 @@
 // 管理者ビュー: ダッシュボード（今日の現場・進捗集計）と案件一覧。
 import { store } from '../db.js';
-import { h, toast, openModal, clear } from '../ui.js';
+import { h, toast, openModal, clear, hintBanner } from '../ui.js';
 import {
   STATUSES, statusInfo, activeSites, sitePhotos, siteReports,
   yen, fmtDate, todayStr,
@@ -48,8 +48,10 @@ function buildHome(wrap, rerender) {
       : h('div', {}, active.map((s) => caseRow(s, `写真 ${sitePhotos(s.id).length}・日報 ${siteReports(s.id).length}`))),
   ]);
 
+  const hint = hintBanner('home', '赤いカードは「お金の漏れ」。各カードのボタンで、その場で片付けられます。困ったら「＋新規」から3つ入れるだけで案件を登録できます。');
   wrap.append(
     h('h1', { class: 'page-title', text: '今日やること' }),
+    hint || h('span', { class: 'hidden' }),
     h('button', { class: 'btn', text: '＋ 新規の案件を登録', onclick: () => openCaseForm(null, rerender) }),
     taskSection,
     todaySection,
@@ -185,6 +187,7 @@ export function renderCases() {
       h('h1', { class: 'page-title', text: '案件' }),
       h('button', { class: 'btn sm', text: '＋ 新規', onclick: () => openCaseForm(null, renderBody) }),
     ]),
+    hintBanner('cases', '「📅カレンダー」で現調・着工・入金予定が月表示になります。上のステータスで絞り込みできます。'),
     viewSwitch,
     body,
   ]);

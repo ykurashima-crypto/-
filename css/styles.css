@@ -86,6 +86,15 @@ body {
   background: linear-gradient(180deg, var(--gold), #8a5e16); border-radius: 2px;
 }
 
+/* 操作案内（ヒント） */
+.hint-banner { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 12px;
+  padding: 11px 12px; border-radius: 12px; font-size: 14px; line-height: 1.5;
+  background: rgba(224,169,59,.12); border: 1px solid rgba(224,169,59,.32); color: #e6d3ab; }
+.hint-banner .hb-ic { flex: 0 0 auto; }
+.hint-banner .hb-text { flex: 1; }
+.hint-banner .hb-close { flex: 0 0 auto; border: 0; background: transparent; color: #e6d3ab;
+  font-size: 20px; line-height: 1; padding: 0 2px; }
+
 /* Tabbar */
 .tabbar {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 30;

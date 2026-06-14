@@ -1,7 +1,7 @@
 // 現場まわりの中核ビュー: 現場詳細 / 日報フォーム / 写真撮影。
 import { store } from '../db.js';
 import { deleteBlob, revokeURL } from '../db.js';
-import { h, toast, photoThumb, openPhoto, openModal, clear } from '../ui.js';
+import { h, toast, photoThumb, openPhoto, openModal, clear, hintBanner } from '../ui.js';
 import {
   STATUSES, statusInfo, PHASES, phaseInfo, addPhoto, sitePhotos, siteReports,
   activeSites, yen, todayStr, fmtDate, fmtDateTime,
@@ -349,7 +349,8 @@ export function renderPhotoCapture(siteId) {
   return h('div', {}, [
     h('button', { class: 'btn ghost sm', text: '← 現場を変える', onclick: () => navigate('photo') }),
     h('h1', { class: 'page-title', text: s.name }),
-    h('div', { class: 'field' }, [h('label', { text: '工程' }), phaseBtns]),
+    hintBanner('photo', 'まず種類を選んで「撮影」。施工前・施工後はしっかり残すと、追加工事やクレームの証拠になります。'),
+    h('div', { class: 'field' }, [h('label', { text: '工程（種類）' }), phaseBtns]),
     h('div', { class: 'field' }, [h('label', { text: 'コメント' }), commentInput]),
     fileInput,
     h('button', { class: 'btn', text: '📷 撮影 / 写真を選ぶ', onclick: () => fileInput.click() }),
@@ -484,6 +485,7 @@ export function renderReportForm(arg) {
   return h('div', {}, [
     h('button', { class: 'btn ghost sm', text: '← 戻る', onclick: () => history.back() }),
     h('h1', { class: 'page-title', text: issueFocus ? '問題・追加工事の報告' : '今日 何しましたか？' }),
+    hintBanner('report', '🎤「話す」を押すと、声で入力できます。最後に「提出」を押す前に内容を確認できます。'),
     ...fields,
   ]);
 }

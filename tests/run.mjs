@@ -201,6 +201,13 @@ test('upcomingSteps は未完了を予定日順に', () => {
   assert.equal(up[0].processType, '下塗り');
 });
 
+group('操作案内（ヒント）');
+test('消したヒントは再表示しない（localStorageで記憶）', async () => {
+  const { hintBanner } = await import(J('js/ui.js'));
+  mem.set('nurilog.hint.t1', '1'); // 一度×で消した状態
+  assert.equal(hintBanner('t1', 'てすと'), null);
+});
+
 group('バックアップ / 復元');
 test('エクスポート→全消去→復元でデータが戻る', async () => {
   const { exportData, importBackup, validateBackup } = await import(J('js/backup.js'));

@@ -1,7 +1,7 @@
 // 職人ホーム＝「今日」。今日の現場・やること・必要な写真・注意事項を大きく表示し、
 // 下部に大きな3ボタン（写真/日報/報告）。金額・案件管理・原価は一切出さない。
 import { store } from '../db.js';
-import { h, toast, clear } from '../ui.js';
+import { h, toast, clear, hintBanner } from '../ui.js';
 import { activeSites, sitePhotos, todayStr } from '../model.js';
 import { navigate } from '../app.js';
 import { siteProcesses, scheduleStatus, completeProcess } from './process.js';
@@ -17,6 +17,8 @@ function build(wrap, rerender) {
   const sites = activeSites();
 
   wrap.append(h('h1', { class: 'page-title', text: '今日の現場' }));
+  const hint = hintBanner('today', '下の大きな3つのボタンで、写真・日報・報告ができます。「今日やること」はチェックすると完了になります。');
+  if (hint) wrap.append(hint);
 
   if (sites.length === 0) {
     wrap.append(h('div', { class: 'empty' }, [h('span', { class: 'ic', text: '🚧' }), '今日の現場はまだありません']));

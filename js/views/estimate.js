@@ -2,7 +2,7 @@
 // 同時に原価を入れて粗利率をチェックし、粗利低下・入力漏れ・値引き超過・赤字を警告する。
 // 仕上げた見積はそのまま「見積書PDF」として出力できる。
 import { store } from '../db.js';
-import { h, toast } from '../ui.js';
+import { h, toast, hintBanner } from '../ui.js';
 import { yen, todayStr } from '../model.js';
 import { navigate } from '../app.js';
 import { openEstimateDoc } from '../doc.js';
@@ -189,6 +189,7 @@ export function renderEstimate(siteId) {
   const node = h('div', {}, [
     h('button', { class: 'btn ghost sm', text: '← 戻る', onclick: () => history.back() }),
     h('h1', { class: 'page-title', text: site ? `見積: ${site.name}` : '見積・粗利計算' }),
+    hintBanner('estimate', '下の項目ボタン（足場・洗浄・上塗り…）を押して明細を足し、数量と単価を入れるだけ。原価を入れると粗利率も自動で出ます。'),
 
     h('div', { class: 'section-title mt-0', text: '見積明細（売価）' }),
     h('p', { class: 'sub mt-0', text: 'よく使う項目はボタンで追加できます。数量と単価を入れると金額が出ます。' }),
