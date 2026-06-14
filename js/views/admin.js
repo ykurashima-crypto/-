@@ -1,63 +1,86 @@
 // 管理者ビュー: ダッシュボード（今日の現場・進捗集計）と案件一覧。
 import { store } from '../db.js';
-import { h, toast, openModal } from '../ui.js';
+import { h, toast, openModal, clear, hintBanner } from '../ui.js';
 import {
   STATUSES, statusInfo, activeSites, sitePhotos, siteReports,
   yen, fmtDate, todayStr,
 } from '../model.js';
 import { navigate } from '../app.js';
 import { computeAlerts, moneySummary } from '../alerts.js';
+import { markInvoiced, markPaid } from '../money.js';
+import { CHANNELS } from './customers.js';
+import { renderCasesCalendar } from './calendar.js';
+import { micButton, parsePhone, parseDate } from '../voice.js';
+import { activeMembers } from './members.js';
 
 export function renderAdminHome() {
-  const sites = store.all('sites');
-  const active = activeSites();
-  const { money, work } = computeAlerts();
-  const sum = moneySummary();
+  // 請求・入金などの操作後に、ホームをその場で作り直して数字とアラートを最新化する。
+  const wrap = h('div', {});
+  const rerender = () => { clear(wrap); buildHome(wrap, rerender); };
+  rerender();
+  return wrap;
+}
 
-  // お金まわりのサマリー（請求漏れ・入金待ちが一目で分かる）
+function greeting() {
+  const hr = new Date().getHours();
+  return hr < 4 ? 'こんばんは' : hr < 11 ? 'おはようございます' : hr < 18 ? 'お疲れさまです' : 'こんばんは';
+}
+
+function buildHome(wrap, rerender) {
+  const active = activeSites();
+  const { tasks, money } = computeAlerts();
+  const sum = moneySummary();
+  const visible = tasks.filter((t) => !isSnoozed(t)); // 「後で通知」で今日は隠したものを除く
+
+  // 最上部 ＝「今日やること」。お金の漏れ→仕事の漏れの優先順で、各タスクに行動ボタン付き。
+  const taskSection = h('div', {}, [
+    h('div', { class: 'section-title', text: '今日やること' }),
+    visible.length === 0
+      ? h('div', { class: 'empty' }, [h('span', { class: 'ic', text: '🍵' }), 'やることはありません。お疲れさまです 👍'])
+      : h('div', {}, visible.map((a) => alertCard(a, rerender))),
+  ]);
+
+  // お金まわりのサマリー（控えめに下部へ）
   const stats = h('div', { class: 'stat-row' }, [
     stat(yen(sum.uninvoiced), '未請求（完工済み）', sum.uninvoiced > 0 ? 'danger' : ''),
     stat(yen(sum.awaitingPayment), '入金待ち'),
     stat(active.length, '稼働中の現場'),
-    stat(money.length + work.length, '要対応', (money.length ? 'danger' : '')),
-  ]);
-
-  // 💸 お金が漏れるぞ（最重要・赤）
-  const moneySection = h('div', {}, [
-    h('div', { class: 'section-title', text: '💸 お金が漏れるぞ' }),
-    money.length === 0
-      ? h('div', { class: 'empty', text: 'お金の漏れはありません 👍' })
-      : h('div', {}, money.map(alertCard)),
-  ]);
-
-  // 📌 やること（仕事の漏れ・中）
-  const workSection = h('div', {}, [
-    h('div', { class: 'section-title', text: '📌 やること（忘れ物チェック）' }),
-    work.length === 0
-      ? h('div', { class: 'empty', text: 'やり残しはありません 👍' })
-      : h('div', {}, work.map(alertCard)),
+    stat(money.length, 'お金の要対応', (money.length ? 'danger' : '')),
   ]);
 
   const todaySection = h('div', {}, [
-    h('div', { class: 'section-title', text: '🚧 今日の現場' }),
+    h('div', { class: 'section-title', text: '🚧 進行中の現場' }),
     active.length === 0
       ? h('div', { class: 'empty', text: '稼働中の現場はありません' })
       : h('div', {}, active.map((s) => caseRow(s, `写真 ${sitePhotos(s.id).length}・日報 ${siteReports(s.id).length}`))),
   ]);
 
-  return h('div', {}, [
-    h('h1', { class: 'page-title', text: '今日やること' }),
-    stats,
-    moneySection,
-    workSection,
+  const hint = hintBanner('home', '赤いカードは「お金の漏れ」。各カードのボタンで、その場で片付けられます。困ったら「＋新規」から3つ入れるだけで案件を登録できます。');
+  wrap.append(
+    h('div', { class: 'greet' }, [
+      h('div', { class: 'hello', text: greeting() }),
+      h('div', { class: 'todo-count', html: `今日やること <b>${visible.length}</b> 件` }),
+    ]),
+    hint || h('span', { class: 'hidden' }),
+    h('button', { class: 'btn', text: '＋ 新規の案件を登録', onclick: () => openCaseForm(null, rerender) }),
+    taskSection,
     todaySection,
-  ]);
+    h('div', { class: 'section-title', text: 'お金の状況' }),
+    stats,
+  );
 }
 
-// アラート1件のカード。タップで該当現場へ。
-function alertCard(a) {
-  return h('div', { class: 'card tap alert-' + a.severity, onclick: () => navigate('site/' + a.siteId) }, [
-    h('div', { class: 'alert-row' }, [
+// 「後で通知」: その案件のタスクを今日だけ隠す（翌日また表示）。
+function snoozeKey(t) { return 'nurilog.snooze.' + t.siteId + '.' + (t.action || '') + '.' + (t.title || '').slice(0, 12); }
+function isSnoozed(t) { return localStorage.getItem(snoozeKey(t)) === todayStr(); }
+function snoozeTask(t) { localStorage.setItem(snoozeKey(t), todayStr()); }
+
+// アラート1件のカード。本文タップで現場へ。種別に応じてワンタップ解決ボタン＋「後で通知」。
+function alertCard(a, onResolved) {
+  const action = alertAction(a, onResolved);
+  const later = h('button', { class: 'btn ghost sm', text: '後で通知', onclick: () => { snoozeTask(a); toast('後でまたお知らせします'); onResolved && onResolved(); } });
+  return h('div', { class: 'card alert-' + a.severity }, [
+    h('div', { class: 'alert-row tap', onclick: () => navigate('site/' + a.siteId) }, [
       h('span', { class: 'alert-ic', text: a.icon }),
       h('div', {}, [
         h('div', { class: 'alert-title', text: a.title }),
@@ -65,7 +88,42 @@ function alertCard(a) {
         h('div', { class: 'alert-detail', text: a.detail }),
       ]),
     ]),
+    h('div', { class: 'alert-actions' }, [h('div', { class: 'btn-row' }, [action, later].filter(Boolean))]),
   ]);
+}
+
+// アラート種別ごとの解決ボタン（その場で記録 → ホーム再描画）。
+function alertAction(a, onResolved) {
+  const site = () => store.get('sites', a.siteId);
+  if (a.action === 'invoice') {
+    return h('button', { class: 'btn sm', text: '🧾 請求書を作った', onclick: () => markInvoiced(site(), onResolved) });
+  }
+  if (a.action === 'payment') {
+    return h('button', { class: 'btn sm', text: '💰 入金を確認した', onclick: () => markPaid(site(), onResolved) });
+  }
+  if (a.action === 'estimate') {
+    return h('button', { class: 'btn sm secondary', text: '🧮 見積を作る', onclick: () => navigate('estimate/' + a.siteId) });
+  }
+  if (a.action === 'survey') {
+    return h('button', { class: 'btn sm secondary', text: '📋 現地調査する', onclick: () => navigate('survey/' + a.siteId) });
+  }
+  if (a.action === 'photo') {
+    return h('button', { class: 'btn sm secondary', text: '📷 写真を追加', onclick: () => navigate('photo/' + a.siteId) });
+  }
+  if (a.action === 'site') {
+    return h('button', { class: 'btn sm secondary', text: '📂 現場を見る', onclick: () => navigate('site/' + a.siteId) });
+  }
+  if (a.action === 'call') {
+    // 追客の連絡を済ませたら消す。現場を開いて詳細確認もできる。
+    return h('div', { class: 'btn-row' }, [
+      h('button', { class: 'btn sm secondary', text: '現場を見る', onclick: () => navigate('site/' + a.siteId) }),
+      h('button', {
+        class: 'btn sm', text: '✔ 連絡した',
+        onclick: () => { store.update('sites', a.siteId, { nextContact: '' }); toast('連絡済みにしました'); onResolved && onResolved(); },
+      }),
+    ]);
+  }
+  return null;
 }
 
 function stat(num, lbl, variant = '') {
@@ -86,9 +144,11 @@ function caseRow(s, meta) {
   ]);
 }
 
-// ---------- 案件一覧 ----------
+// ---------- 案件一覧 / カレンダー ----------
 export function renderCases() {
   let filter = 'all';
+  let view = 'list'; // 'list' | 'calendar'
+  const body = h('div', {});
   const listWrap = h('div', {});
 
   const renderList = () => {
@@ -120,61 +180,172 @@ export function renderCases() {
     return b;
   }
 
-  renderList();
+  const renderBody = () => {
+    if (view === 'list') {
+      renderList();
+      body.replaceChildren(filterBar, listWrap);
+    } else {
+      body.replaceChildren(renderCasesCalendar());
+    }
+  };
+
+  // 一覧 / カレンダー 切替
+  const viewSwitch = h('div', { class: 'role-switch', style: 'width:100%;margin-bottom:10px' }, [
+    h('button', { class: view === 'list' ? 'active' : '', text: '📋 一覧', onclick: (e) => { view = 'list'; pickView(e); } }),
+    h('button', { class: view === 'calendar' ? 'active' : '', text: '📅 カレンダー', onclick: (e) => { view = 'calendar'; pickView(e); } }),
+  ]);
+  function pickView(e) { viewSwitch.querySelectorAll('button').forEach((b) => b.classList.remove('active')); e.target.classList.add('active'); renderBody(); }
+
+  renderBody();
 
   return h('div', {}, [
     h('div', { class: 'card-row' }, [
-      h('h1', { class: 'page-title', text: '案件一覧' }),
-      h('button', { class: 'btn sm', text: '＋ 新規', onclick: () => openCaseForm(null, renderList) }),
+      h('h1', { class: 'page-title', text: '案件' }),
+      h('button', { class: 'btn sm', text: '＋ 新規', onclick: () => openCaseForm(null, renderBody) }),
     ]),
-    filterBar,
-    listWrap,
+    hintBanner('cases', '「📅カレンダー」で現調・着工・入金予定が月表示になります。上のステータスで絞り込みできます。'),
+    viewSwitch,
+    body,
   ]);
 }
 
-// 案件の新規登録・編集を兼ねるフォーム。site を渡すと編集、null なら新規。
-export function openCaseForm(site, onDone) {
+// 新規案件は「3項目だけ」で30秒登録。詳細は登録後の導線から後で足す。
+// 名前(現場名/顧客名)・電話・次の予定日のみ。preset で顧客情報を引き継げる。
+function openQuickCaseForm(preset, onDone) {
+  const nameEl = h('input', { type: 'text', placeholder: '例）田中様邸 / 田中 健一', value: preset?.customer || '' });
+  const phoneEl = h('input', { type: 'tel', placeholder: '090-1234-5678', value: preset?.phone || '' });
+  const dateEl = h('input', { type: 'date' });
+
+  const save = () => {
+    const name = nameEl.value.trim();
+    if (!name) { toast('お名前か現場名を入れてください'); return; }
+    const rec = store.insert('sites', {
+      name, customer: preset?.customer || '', phone: phoneEl.value.trim(),
+      address: preset?.address || '', nextContact: dateEl.value,
+      inquiryDate: todayStr(), status: 'lead', customerId: preset?.customerId || null,
+    });
+    toast('登録しました');
+    openPostRegister(rec, onDone);
+  };
+
+  // 音声: 名前欄に話すと、電話番号・日付を自動で拾って各欄へ
+  const nameMic = micButton(nameEl, (val) => {
+    if (!phoneEl.value) { const p = parsePhone(val); if (p) phoneEl.value = p; }
+    if (!dateEl.value) { const d = parseDate(val); if (d) dateEl.value = d; }
+  });
+
+  openModal('かんたん登録（3つだけ）', h('div', {}, [
+    h('p', { class: 'sub mt-0', text: 'まずはこの3つだけでOK。🎤で話すと電話・日付も自動で拾います。' }),
+    h('div', { class: 'field' }, [h('label', { text: 'お客様の名前 / 現場名（必須）' }),
+      h('div', { class: 'field-mic' }, [nameEl, nameMic])]),
+    h('div', { class: 'field' }, [h('label', { text: '電話番号' }), phoneEl]),
+    h('div', { class: 'field' }, [h('label', { text: '次の予定日（連絡・現調など）' }), dateEl]),
+    h('button', { class: 'btn', text: 'この内容で登録', onclick: save }),
+  ]));
+}
+
+// 登録直後の安心感＆次の一手の導線。「登録しました。次は何をしますか？」
+function openPostRegister(site, onDone) {
+  const root = () => document.getElementById('modal-root');
+  const go = (route) => { root().replaceChildren(); if (onDone) onDone(); navigate(route); };
+  openModal('登録しました ✅', h('div', {}, [
+    h('p', { class: 'sub mt-0', text: `「${site.name}」を登録しました。次は何をしますか？` }),
+    h('button', { class: 'btn', text: '📋 現地調査をする', onclick: () => go('survey/' + site.id) }),
+    h('button', { class: 'btn secondary', text: '🧮 見積を作る', onclick: () => go('estimate/' + site.id) }),
+    h('button', { class: 'btn secondary', text: '📷 写真を撮る', onclick: () => go('photo/' + site.id) }),
+    h('button', { class: 'btn secondary', text: '✏️ 住所・日付など詳しく入れる', onclick: () => { root().replaceChildren(); openCaseForm(store.get('sites', site.id), onDone); } }),
+    h('button', { class: 'btn ghost', text: '後で入力する', onclick: () => go('site/' + site.id) }),
+  ]));
+}
+
+// 案件フォーム。site を渡すと編集（詳細項目つき）、null なら3項目のかんたん登録へ。
+// preset を渡すと初期値を流し込む（例: 顧客詳細から「この顧客で新規案件」）。
+export function openCaseForm(site, onDone, preset = null) {
   const editing = !!site;
+  if (!editing) return openQuickCaseForm(preset, onDone);
   const f = {};
+  const src = editing ? site : (preset || {});
   const input = (key, label, type = 'text', ph = '') => {
-    const v = editing ? (site[key] ?? '') : '';
-    const el = h('input', { type, placeholder: ph, value: type === 'number' ? (v ?? '') : v });
+    const v = src[key] ?? (key === 'inquiryDate' && !editing ? todayStr() : '');
+    const el = h('input', { type, placeholder: ph, value: v });
     f[key] = el;
     return h('div', { class: 'field' }, [h('label', { text: label }), el]);
   };
+  // 問合せ経路は選択式（自由入力をやめて迷いを減らす）
+  const channelSel = h('select', {}, [
+    h('option', { value: '', text: '（未選択）' }),
+    ...CHANNELS.map((c) => h('option', { value: c, selected: src.channel === c ? 'selected' : null, text: c })),
+  ]);
+  f.channel = channelSel;
   const statusSel = h('select', {}, STATUSES.map((st) =>
-    h('option', { value: st.key, selected: editing && site.status === st.key ? 'selected' : null, text: st.label })));
+    h('option', { value: st.key, selected: (src.status || 'lead') === st.key ? 'selected' : null, text: st.label })));
   f.status = statusSel;
+  const memo = h('textarea', { placeholder: '例）色は後日決定。日中不在、夕方連絡可', style: 'min-height:56px' }, src.memo || '');
+  f.memo = memo;
 
-  const form = h('div', {}, [
-    input('name', '現場名 / 案件名', 'text', '例）田中様邸 外壁塗装'),
+  // 新規＝最小項目 / 編集＝詳細（日付・金額）も表示
+  const baseFields = [
+    input('name', '現場名 / 案件名（必須）', 'text', '例）田中様邸 外壁塗装'),
     input('customer', '顧客名', 'text', '例）田中 健一'),
     h('div', { class: 'grid-2' }, [input('phone', '連絡先', 'tel', '090-...'), input('manager', '担当', 'text', '担当者名')]),
     input('address', '住所', 'text', '市区町村〜番地'),
-    h('div', { class: 'grid-2' }, [input('channel', '問合せ経路', 'text', 'チラシ/紹介/Web'), input('inquiryDate', '問合せ日', 'date')]),
-    h('div', { class: 'grid-2' }, [input('surveyDate', '現調日', 'date'), input('estimateDate', '見積提出日', 'date')]),
-    h('div', { class: 'grid-2' }, [input('estimateAmount', '見積金額', 'number', '円'), input('constructionStart', '着工予定日', 'date')]),
-    h('div', { class: 'grid-2' }, [input('paymentDueDate', '入金予定日', 'date'), input('nextContact', '次回連絡日', 'date')]),
+    h('div', { class: 'grid-2' }, [
+      h('div', { class: 'field' }, [h('label', { text: '問合せ経路' }), channelSel]),
+      input('inquiryDate', '問合せ日', 'date'),
+    ]),
+    h('div', { class: 'grid-2' }, [input('surveyDate', '現調予定日', 'date'), input('constructionStart', '着工予定日', 'date')]),
+    h('div', { class: 'grid-2' }, [input('workStart', '集合/作業開始', 'time'), input('workEnd', '作業終了予定', 'time')]),
     h('div', { class: 'field' }, [h('label', { text: 'ステータス' }), statusSel]),
-    h('button', {
-      class: 'btn', text: editing ? '更新する' : '登録する',
-      onclick: () => {
-        if (!f.name.value.trim()) { toast('現場名を入力してください'); return; }
-        const data = {
-          name: f.name.value.trim(), customer: f.customer.value.trim(), phone: f.phone.value.trim(),
-          manager: f.manager.value.trim(), address: f.address.value.trim(), channel: f.channel.value.trim(),
-          inquiryDate: f.inquiryDate.value, surveyDate: f.surveyDate.value, estimateDate: f.estimateDate.value,
-          constructionStart: f.constructionStart.value, paymentDueDate: f.paymentDueDate.value,
-          nextContact: f.nextContact.value, status: f.status.value,
-          estimateAmount: f.estimateAmount.value ? parseInt(f.estimateAmount.value, 10) : null,
-        };
-        if (editing) { store.update('sites', site.id, data); toast('案件を更新しました'); }
-        else { store.insert('sites', data); toast('案件を登録しました'); }
-        document.getElementById('modal-root').replaceChildren();
-        if (onDone) onDone();
-      },
-    }),
-  ]);
+    h('div', { class: 'field' }, [h('label', { text: 'メモ（🎤 話して入力できます）' }),
+      h('div', { class: 'field-mic' }, [memo, micButton(memo)])]),
+  ];
+  const detailFields = editing ? [
+    h('div', { class: 'section-title', text: '金額・日程（必要になったら入力）' }),
+    h('div', { class: 'grid-2' }, [input('estimateDate', '見積提出日', 'date'), input('estimateAmount', '見積金額', 'number', '円')]),
+    h('div', { class: 'grid-2' }, [input('contractAmount', '契約金額', 'number', '円'), input('completionDate', '完工日', 'date')]),
+    h('div', { class: 'grid-2' }, [input('invoiceDate', '請求日', 'date'), input('paymentDueDate', '入金予定日', 'date')]),
+    h('div', { class: 'grid-2' }, [input('paymentDate', '入金日', 'date'), input('nextContact', '次回連絡日', 'date')]),
+  ] : [];
 
+  const save = () => {
+    if (!f.name.value.trim()) { toast('現場名を入力してください'); return; }
+    const data = {
+      name: f.name.value.trim(), customer: f.customer.value.trim(), phone: f.phone.value.trim(),
+      manager: f.manager.value.trim(), address: f.address.value.trim(), channel: channelSel.value,
+      inquiryDate: f.inquiryDate.value, surveyDate: f.surveyDate.value,
+      constructionStart: f.constructionStart.value, workStart: f.workStart.value, workEnd: f.workEnd.value,
+      status: f.status.value, memo: memo.value.trim(),
+      customerId: editing ? (site.customerId || null) : (preset?.customerId || null),
+    };
+    // 詳細項目は編集時のみ更新（新規では既存の最小項目だけ保存）
+    if (editing) {
+      Object.assign(data, {
+        estimateDate: f.estimateDate.value, completionDate: f.completionDate.value,
+        invoiceDate: f.invoiceDate.value, paymentDueDate: f.paymentDueDate.value,
+        paymentDate: f.paymentDate.value, nextContact: f.nextContact.value,
+        estimateAmount: f.estimateAmount.value ? parseInt(f.estimateAmount.value, 10) : null,
+        contractAmount: f.contractAmount.value ? parseInt(f.contractAmount.value, 10) : null,
+      });
+      store.update('sites', site.id, data); toast('案件を更新しました');
+    } else {
+      store.insert('sites', data); toast('案件を登録しました');
+    }
+    document.getElementById('modal-root').replaceChildren();
+    if (onDone) onDone();
+  };
+
+  // 担当はメンバー名簿から選べる（自由入力も可）
+  const members = activeMembers();
+  if (members.length && f.manager) {
+    f.manager.setAttribute('list', 'nurilog-members');
+  }
+  const datalist = members.length
+    ? h('datalist', { id: 'nurilog-members' }, members.map((m) => h('option', { value: m.name })))
+    : null;
+
+  const form = h('div', {}, [
+    ...baseFields, ...detailFields, datalist,
+    h('button', { class: 'btn', text: editing ? '更新する' : '登録する', onclick: save }),
+  ]);
   openModal(editing ? '案件を編集' : '新規案件', form);
 }

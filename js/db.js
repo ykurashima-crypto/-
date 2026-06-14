@@ -8,6 +8,11 @@ const defaultData = {
   reports: [], // 日報
   photos: [],  // 写真メタ情報 (実体は IndexedDB)
   estimates: [], // 見積
+  customers: [], // 顧客
+  surveys: [],   // 現地調査
+  processes: [], // 工程
+  extras: [],    // 追加工事
+  members: [],   // メンバー名簿（職人・協力会社など）
 };
 
 function load() {
@@ -28,11 +33,23 @@ function persist() {
   localStorage.setItem(LS_KEY, JSON.stringify(data));
 }
 
-export function uid(prefix = 'id') {
-  return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+// レコードIDは UUID(v4) を採番する。
+// 本番(Supabase)の uuid 主キーにそのまま入るようにし、クライアント生成IDの型不一致を防ぐ。
+// 引数 prefix は後方互換のため受け取るが、値には影響しない（純粋なUUIDを返す）。
+export function uid(_prefix = 'id') {
+  const c = globalThis.crypto;
+  if (c?.randomUUID) return c.randomUUID();
+  // セキュアコンテキスト外(file://等)向けフォールバック（RFC4122 v4）
+  const buf = new Uint8Array(16);
+  if (c?.getRandomValues) c.getRandomValues(buf);
+  else for (let i = 0; i < 16; i++) buf[i] = Math.floor(Math.random() * 256);
+  buf[6] = (buf[6] & 0x0f) | 0x40; // version 4
+  buf[8] = (buf[8] & 0x3f) | 0x80; // variant
+  const hex = [...buf].map((b) => b.toString(16).padStart(2, '0'));
+  return `${hex.slice(0, 4).join('')}-${hex.slice(4, 6).join('')}-${hex.slice(6, 8).join('')}-${hex.slice(8, 10).join('')}-${hex.slice(10, 16).join('')}`;
 }
 
-export const SYNC_COLLECTIONS = ['sites', 'reports', 'estimates', 'photos'];
+export const SYNC_COLLECTIONS = ['sites', 'reports', 'estimates', 'photos', 'customers', 'surveys', 'processes', 'extras', 'members'];
 
 // 同期通知（ローカル変更時に共有同期をトリガーするためのフック）
 let onChange = null;

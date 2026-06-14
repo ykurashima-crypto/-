@@ -28,21 +28,41 @@ export function cloudState() {
     role: profile?.role || null,
     companyId: profile?.company_id || null,
     fullName: profile?.full_name || null,
+    planType: profile?.companies?.plan_type || null,
+    companyName: profile?.companies?.name || null,
+    inviteCode: profile?.companies?.invite_code || null,
   };
 }
 export function currentRole() { return profile?.role || null; }
 
 // ローカル↔DB のフィールド対応（camelCase ↔ snake_case）
 const MAP = {
-  sites: { siteId: null, name: 'name', customer: 'customer', phone: 'phone', address: 'address',
-    manager: 'manager', channel: 'channel', status: 'status', inquiryDate: 'inquiry_date',
+  sites: { siteId: null, name: 'name', customer: 'customer', customerId: 'customer_id', phone: 'phone',
+    address: 'address', manager: 'manager', channel: 'channel', status: 'status', inquiryDate: 'inquiry_date',
     surveyDate: 'survey_date', estimateDate: 'estimate_date', estimateAmount: 'estimate_amount',
-    constructionStart: 'construction_start', nextContact: 'next_contact' },
+    contractAmount: 'contract_amount', constructionStart: 'construction_start',
+    completionDate: 'completion_date', invoiceDate: 'invoice_date', paymentDueDate: 'payment_due_date',
+    paymentDate: 'payment_date', paymentStatus: 'payment_status', nextContact: 'next_contact', memo: 'memo',
+    workStart: 'work_start', workEnd: 'work_end', invoiceNote: 'invoice_note' },
+  customers: { name: 'name', phone: 'phone', address: 'address', channel: 'channel',
+    inquiryDate: 'inquiry_date', email: 'email', postalCode: 'postal_code',
+    customerType: 'customer_type', memo: 'note' },
+  surveys: { siteId: 'site_id', buildingType: 'building_type', buildingAge: 'building_age',
+    floors: 'floors', wallMaterial: 'wall_material', roofMaterial: 'roof_material',
+    paintingArea: 'painting_area', scaffolding: 'scaffolding_required', parking: 'parking_information',
+    deterioration: 'deterioration', memo: 'memo', surveyedBy: 'surveyed_by', surveyedAt: 'surveyed_at' },
+  processes: { siteId: 'site_id', processType: 'process_type', scheduledDate: 'scheduled_date',
+    completedDate: 'completed_date', status: 'status', delayReason: 'delay_reason',
+    memo: 'memo', sortOrder: 'sort_order' },
+  extras: { siteId: 'site_id', content: 'content', amount: 'amount', reason: 'reason',
+    status: 'status', billed: 'billed', photoId: 'photo_id',
+    approvedBy: 'approved_by', approvedAt: 'approved_at' },
+  members: { name: 'name', role: 'role', phone: 'phone', active: 'active', note: 'note' },
   reports: { siteId: 'site_id', date: 'date', worker: 'worker', workContent: 'work_content',
     materials: 'materials', hours: 'hours', problems: 'problems' },
   estimates: { siteId: 'site_id', total: 'total', sell: 'sell', profit: 'profit', margin: 'margin' },
   photos: { siteId: 'site_id', reportId: 'report_id', phase: 'phase', comment: 'comment',
-    size: 'size', storagePath: 'storage_path' },
+    size: 'size', storagePath: 'storage_path', takenBy: 'taken_by' },
 };
 const COMMON_OUT = ['id', 'deleted'];
 
@@ -99,14 +119,43 @@ export async function signIn(email, password) {
   const { error } = await sb.auth.signInWithPassword({ email, password });
   if (error) throw error;
 }
+// 新規登録。メール確認が有効な場合はセッションが張られないことがある（その旨を呼び出し側に返す）。
+export async function signUp(email, password, fullName) {
+  const { data, error } = await sb.auth.signUp({
+    email, password, options: { data: { full_name: fullName || '' } },
+  });
+  if (error) throw error;
+  return { needsConfirm: !data.session };
+}
+export async function resetPassword(email) {
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+  if (error) throw error;
+}
 export async function signOut() {
   await sb.auth.signOut();
   session = null; profile = null; emit();
 }
 
+// 会社（事業者）を自分で作成し、自分をその管理者(owner相当)にする。
+// サーバー側の SECURITY DEFINER 関数 create_my_company で、未所属ユーザーのみ作成可能。
+export async function createMyCompany(name, planType) {
+  const { error } = await sb.rpc('create_my_company', { p_name: name, p_plan: planType });
+  if (error) throw error;
+  await loadProfile();
+  emit();
+}
+// 招待コードで既存の会社に参加する（家族補助者・職人）。
+export async function joinCompany(code) {
+  const { error } = await sb.rpc('join_company', { p_code: code });
+  if (error) throw error;
+  await loadProfile();
+  emit();
+}
+
 async function loadProfile() {
   const { data, error } = await sb.from('profiles')
-    .select('company_id, role, full_name').eq('id', session.user.id).single();
+    .select('company_id, role, full_name, companies(name, plan_type, invite_code)')
+    .eq('id', session.user.id).single();
   if (error) { console.warn('プロフィール取得失敗', error.message); profile = null; return; }
   profile = data;
 }

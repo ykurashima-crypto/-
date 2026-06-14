@@ -1,20 +1,27 @@
 // 現場まわりの中核ビュー: 現場詳細 / 日報フォーム / 写真撮影。
 import { store } from '../db.js';
 import { deleteBlob, revokeURL } from '../db.js';
-import { h, toast, photoThumb, openPhoto, openModal, clear } from '../ui.js';
+import { h, toast, photoThumb, openPhoto, openModal, clear, hintBanner } from '../ui.js';
 import {
   STATUSES, statusInfo, PHASES, phaseInfo, addPhoto, sitePhotos, siteReports,
   activeSites, yen, todayStr, fmtDate, fmtDateTime,
 } from '../model.js';
 import { navigate } from '../app.js';
 import { openCaseForm } from './admin.js';
+import { markInvoiced, markPaid } from '../money.js';
+import { openEstimateDoc, openInvoiceDoc } from '../doc.js';
+import { micButton } from '../voice.js';
+import { latestSurvey, surveySummary } from './survey.js';
+import { processProgress, siteProcesses, completeProcess } from './process.js';
+import { extraBlock } from './extra.js';
+import { canManage } from '../roles.js';
 
 // ---------- 現場詳細 ----------
 export function renderSite(siteId) {
   const s = store.get('sites', siteId);
   if (!s) return h('div', { class: 'empty', text: '現場が見つかりません' });
   const si = statusInfo(s.status);
-  const isAdmin = localStorage.getItem('nurilog.role') === 'admin';
+  const isAdmin = canManage(localStorage.getItem('nurilog.role') || 'worker');
 
   const photos = sitePhotos(s.id);
   const reports = siteReports(s.id);
@@ -39,13 +46,21 @@ export function renderSite(siteId) {
       : h('div', {}, reports.map(reportCard)),
   ]);
 
-  // 案件情報（管理者はステータス変更可）
-  const infoRows = [
+  // 案件情報（管理者はステータス変更可）。
+  // 職人(worker)には金額・お金まわりは一切表示しない。
+  const infoRows = isAdmin ? [
     ['顧客', s.customer], ['連絡先', s.phone], ['住所', s.address],
     ['担当', s.manager], ['問合せ経路', s.channel],
     ['問合せ日', fmtDate(s.inquiryDate)], ['現調', fmtDate(s.surveyDate)],
     ['見積提出', fmtDate(s.estimateDate)], ['見積金額', s.estimateAmount ? yen(s.estimateAmount) : '—'],
     ['着工予定', fmtDate(s.constructionStart)], ['次回連絡', fmtDate(s.nextContact)],
+    ['メモ', s.memo],
+  ] : [
+    ['顧客', s.customer], ['住所', s.address], ['担当', s.manager],
+    ['現調', fmtDate(s.surveyDate)],
+    ['着工予定', fmtDate(s.constructionStart)],
+    ['作業時間', (s.workStart || s.workEnd) ? `${s.workStart || '—'}〜${s.workEnd || '—'}` : '—'],
+    ['メモ', s.memo],
   ];
   const infoCard = h('div', { class: 'card' }, infoRows.map(([k, v]) =>
     h('div', { class: 'kv' }, [h('span', { class: 'k', text: k }), h('span', { class: 'v', text: v || '—' })])));
@@ -57,9 +72,36 @@ export function renderSite(siteId) {
       ])
     : h('span', { class: 'pill ' + si.cls, text: si.label });
 
+  // 住所から地図を開く（電話発信ボタンは廃止）。
+  const contactRow = s.address
+    ? h('div', { class: 'btn-row' }, [
+        h('a', {
+          class: 'btn secondary', target: '_blank', rel: 'noopener',
+          href: 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(s.address),
+          text: '🗺 地図を開く',
+        }),
+      ])
+    : null;
+
+  // お金まわりのワンタップ操作（管理者のみ）。完工→請求→入金を現場画面からも記録できる。
+  const moneyActions = isAdmin ? moneyActionBlock(s) : null;
+
   const estimateBtn = isAdmin
     ? h('button', { class: 'btn secondary', text: '🧮 この現場の見積を作る', onclick: () => navigate('estimate/' + s.id) })
     : null;
+
+  // 書類PDF（管理者）。見積はこの現場の最新見積、無ければ見積金額の一式から生成。
+  const docButtons = isAdmin ? documentBlock(s) : null;
+
+  // 現地調査（記録があれば要約、無ければ作成導線）
+  const surveySection = surveyBlock(s);
+
+  // 工程（進捗サマリー）。職人も作業フェーズを確認できるよう全員に表示。
+  const processSection = processBlock(s);
+
+  // 追加工事（管理者）。登録/承認後にこの画面を作り直す。
+  const rerenderSite = () => { const v = document.getElementById('view'); if (v) { clear(v); v.append(renderSite(siteId)); window.scrollTo(0, 0); } };
+  const extraSection = isAdmin ? extraBlock(s, rerenderSite) : null;
 
   // 管理者向け: 案件の編集・削除
   const adminActions = isAdmin
@@ -81,17 +123,105 @@ export function renderSite(siteId) {
     h('button', { class: 'btn ghost sm', text: '← 戻る', onclick: () => history.back() }),
     h('h1', { class: 'page-title', text: s.name }),
     statusControl,
+    contactRow,
     h('div', { class: 'btn-row' }, [
       h('button', { class: 'btn', text: '📷 写真を追加', onclick: () => navigate('photo/' + s.id) }),
       h('button', { class: 'btn secondary', text: '📝 日報', onclick: () => navigate('report/' + s.id) }),
     ]),
+    moneyActions,
+    surveySection,
+    processSection,
+    extraSection,
     photoSection,
     reportSection,
     h('div', { class: 'section-title', text: '案件情報' }),
     infoCard,
     estimateBtn,
+    docButtons,
     adminActions,
   ]);
+}
+
+// 現地調査の要約 or 作成ボタン。
+function surveyBlock(s) {
+  const srv = latestSurvey(s.id);
+  const head = h('div', { class: 'card-row' }, [
+    h('div', { class: 'section-title mt-0', text: '現地調査' }),
+    h('button', { class: 'btn ghost sm', text: srv ? '✏️ 編集' : '＋ 調査する', onclick: () => navigate('survey/' + s.id) }),
+  ]);
+  if (!srv) {
+    return h('div', {}, [head, h('div', { class: 'empty', text: 'まだ調査記録がありません' })]);
+  }
+  const sum = surveySummary(srv);
+  return h('div', {}, [
+    head,
+    h('div', { class: 'card tap', onclick: () => navigate('survey/' + s.id) }, [
+      h('div', { class: 'sub', text: `${sum.head}${sum.date ? '　調査日 ' + sum.date : ''}` }),
+      sum.deterioration.length
+        ? h('div', { class: 'chip-wrap', style: 'margin-top:8px' }, sum.deterioration.map((d) => h('span', { class: 'chip on', text: d })))
+        : h('div', { class: 'sub', text: '劣化の記録なし' }),
+      srv.memo ? h('div', { class: 'sub', style: 'margin-top:8px', text: srv.memo.slice(0, 80) }) : null,
+    ]),
+  ]);
+}
+
+// 工程の進捗サマリー or 作成導線。
+function processBlock(s) {
+  const prog = processProgress(s.id);
+  const head = h('div', { class: 'card-row' }, [
+    h('div', { class: 'section-title mt-0', text: '工程' }),
+    h('button', { class: 'btn ghost sm', text: prog ? '工程表を開く' : '＋ 工程表を作る', onclick: () => navigate('process/' + s.id) }),
+  ]);
+  if (!prog) return h('div', {}, [head, h('div', { class: 'empty', text: 'まだ工程表がありません' })]);
+  return h('div', {}, [
+    head,
+    h('div', { class: 'card tap', onclick: () => navigate('process/' + s.id) }, [
+      h('div', { class: 'sub', text: `完了 ${prog.done} / 全 ${prog.total} 工程${prog.done === prog.total ? '（完工 🎉）' : ''}` }),
+    ]),
+  ]);
+}
+
+// 見積書・請求書のPDF出力ボタン群。状況に応じて出せる書類だけ表示する。
+function documentBlock(s) {
+  const latestEst = store.all('estimates')
+    .filter((e) => e.siteId === s.id)
+    .sort((a, b) => b.createdAt - a.createdAt)[0] || null;
+  const canEstimate = !!(latestEst || s.estimateAmount);
+  const canInvoice = !!(s.contractAmount || s.estimateAmount) && ['done', 'billed', 'paid'].includes(s.status);
+  const hasPhotos = sitePhotos(s.id).length > 0;
+  if (!canEstimate && !canInvoice && !hasPhotos) return null;
+  return h('div', {}, [
+    h('div', { class: 'section-title', text: '書類（PDF）' }),
+    h('div', { class: 'btn-row' }, [
+      canEstimate ? h('button', { class: 'btn secondary', text: '📄 見積書', onclick: () => openEstimateDoc(s, latestEst) }) : null,
+      canInvoice ? h('button', { class: 'btn secondary', text: '📄 請求書', onclick: () => openInvoiceDoc(s) }) : null,
+    ]),
+    hasPhotos ? h('button', { class: 'btn secondary', style: 'margin-top:8px', text: '📷 写真報告書をつくる', onclick: () => navigate('photodoc/' + s.id) }) : null,
+  ]);
+}
+
+// 完工→請求→入金の進み具合に応じたワンタップ操作カード。
+function moneyActionBlock(s) {
+  const refresh = () => navigate('site/' + s.id);
+  if (s.status === 'done') {
+    return h('div', { class: 'card alert-money' }, [
+      h('div', { class: 'alert-title', text: '🧾 まだ請求していません' }),
+      h('div', { class: 'alert-detail', text: '完工済みです。請求書を作ってお金を回収しましょう。' }),
+      h('button', { class: 'btn sm', style: 'margin-top:8px', text: '請求書を作った', onclick: () => markInvoiced(s, refresh) }),
+    ]);
+  }
+  if (s.status === 'billed') {
+    const overdue = s.paymentDueDate && s.paymentDueDate < todayStr();
+    return h('div', { class: 'card ' + (overdue ? 'alert-money' : '') }, [
+      h('div', { class: 'alert-title', text: overdue ? '⏰ 入金予定日を過ぎています' : '💰 入金待ち' }),
+      h('div', { class: 'alert-detail', text: s.paymentDueDate ? `入金予定日: ${s.paymentDueDate}` : '入金予定日が未設定です' }),
+      h('button', { class: 'btn sm', style: 'margin-top:8px', text: '入金を確認した', onclick: () => markPaid(s, refresh) }),
+    ]);
+  }
+  if (s.status === 'paid') {
+    return h('div', { class: 'warn-box ok', text: `✅ 入金済み${s.paymentDate ? '（' + s.paymentDate + '）' : ''}` });
+  }
+  return null;
 }
 
 function statusSelect(current, onchange) {
@@ -154,6 +284,8 @@ function kv(k, v) {
 // ---------- 写真撮影 ----------
 export function renderPhotoCapture(siteId) {
   const sites = pickSites();
+  // 今日の現場が1件だけなら、選ばせずに自動でその現場へ紐付ける
+  if (!siteId && sites.length === 1) siteId = sites[0].id;
   if (!siteId && sites.length === 0) {
     return h('div', { class: 'empty', text: '対象の現場がありません。管理者に案件登録を依頼してください。' });
   }
@@ -173,14 +305,14 @@ export function renderPhotoCapture(siteId) {
   if (!s) return h('div', { class: 'empty', text: '現場が見つかりません' });
 
   let phase = 'before';
-  const phaseBtns = h('div', { class: 'role-switch', style: 'width:100%' },
+  const phaseBtns = h('div', { class: 'chip-wrap' },
     PHASES.map((p) => h('button', {
-      class: p.key === phase ? 'active' : '',
+      class: 'chip' + (p.key === phase ? ' on' : ''),
       text: p.label,
       onclick: (e) => {
         phase = p.key;
-        phaseBtns.querySelectorAll('button').forEach((b) => b.classList.remove('active'));
-        e.target.classList.add('active');
+        phaseBtns.querySelectorAll('button').forEach((b) => b.classList.remove('on'));
+        e.target.classList.add('on');
       },
     })));
 
@@ -209,7 +341,7 @@ export function renderPhotoCapture(siteId) {
         await addPhoto({ siteId: s.id, phase, comment: commentInput.value.trim(), file: f });
       }
       commentInput.value = '';
-      toast(`${files.length}枚を保存しました`);
+      toast(`保存しました（${files.length}枚）。続けて撮れます`);
       renderGrid();
       e.target.value = '';
     },
@@ -218,10 +350,15 @@ export function renderPhotoCapture(siteId) {
   return h('div', {}, [
     h('button', { class: 'btn ghost sm', text: '← 現場を変える', onclick: () => navigate('photo') }),
     h('h1', { class: 'page-title', text: s.name }),
-    h('div', { class: 'field' }, [h('label', { text: '工程' }), phaseBtns]),
+    hintBanner('photo', 'まず種類を選んで「撮影」。施工前・施工後はしっかり残すと、追加工事やクレームの証拠になります。'),
+    h('div', { class: 'field' }, [h('label', { text: '工程（種類）' }), phaseBtns]),
     h('div', { class: 'field' }, [h('label', { text: 'コメント' }), commentInput]),
     fileInput,
-    h('button', { class: 'btn', text: '📷 撮影 / 写真を選ぶ', onclick: () => fileInput.click() }),
+    h('button', { class: 'btn', text: '📷 写真を撮る', onclick: () => fileInput.click() }),
+    h('div', { class: 'btn-row' }, [
+      h('button', { class: 'btn secondary', text: '日報を書く', onclick: () => navigate('report/' + s.id) }),
+      h('button', { class: 'btn ghost', text: '完了する', onclick: () => navigate(localStorage.getItem('nurilog.role') === 'admin' ? 'site/' + s.id : 'worker') }),
+    ]),
     h('div', { class: 'section-title', text: `この現場の写真（${sitePhotos(s.id).length}）` }),
     grid,
   ]);
@@ -245,6 +382,17 @@ export function renderReportForm(arg) {
   const hoursInput = h('input', { type: 'number', step: '0.5', min: '0', placeholder: '例）7.5' });
   const problemInput = h('textarea', { placeholder: '例）破風板に腐食あり。追加で板金補修が必要（写真添付済）' });
 
+  // 今日完了した工程（選ぶと、その工程を完了にして進捗を進める）。現場切替で中身を更新。
+  const processSel = h('select', {});
+  const fillProcess = () => {
+    const todo = siteProcesses(siteSel.value).filter((p) => p.status !== 'done');
+    processSel.replaceChildren(
+      h('option', { value: '', text: '（なし）' }),
+      ...todo.map((p) => h('option', { value: p.id, text: p.processType })));
+  };
+  fillProcess();
+  siteSel.addEventListener('change', fillProcess);
+
   // 添付写真（送信時に日報へ紐付け）
   const pending = []; // {file, phase}
   const pendingGrid = h('div', { class: 'photo-grid' });
@@ -267,12 +415,9 @@ export function renderReportForm(arg) {
     onchange: (e) => { [...e.target.files].forEach((file) => pending.push({ file, phase: 'during' })); renderPending(); e.target.value = ''; },
   });
 
-  const submit = async () => {
+  // 実際の保存処理（確認後に呼ぶ）
+  const doSubmit = async () => {
     const siteId = siteSel.value;
-    if (!contentInput.value.trim() && !problemInput.value.trim()) {
-      toast('作業内容か問題のどちらかを入力してください');
-      return;
-    }
     localStorage.setItem('nurilog.worker', workerInput.value.trim());
     const report = store.insert('reports', {
       siteId,
@@ -286,13 +431,36 @@ export function renderReportForm(arg) {
     for (const item of pending) {
       await addPhoto({ siteId, reportId: report.id, phase: item.phase, comment: '', file: item.file });
     }
-    toast('日報を送信しました');
-    navigate('site/' + siteId);
+    if (processSel.value) completeProcess(processSel.value, dateInput.value);
+    clear(document.getElementById('modal-root'));
+    toast('日報を提出しました');
+    // 職人は「今日」へ、管理者は現場詳細へ
+    navigate(localStorage.getItem('nurilog.role') === 'admin' ? 'site/' + siteId : 'worker');
+  };
+
+  // 「この内容で提出しますか？」と確認してから保存する
+  const submit = () => {
+    if (!contentInput.value.trim() && !problemInput.value.trim()) {
+      toast('作業内容か問題のどちらかを入力してください');
+      return;
+    }
+    const line = (k, v) => v ? h('div', { class: 'kv' }, [h('span', { class: 'k', text: k }), h('span', { class: 'v', text: v })]) : null;
+    const proc = processSel.value ? processSel.options[processSel.selectedIndex].text : '';
+    openModal('この内容で提出しますか？', h('div', {}, [
+      line('現場', siteSel.options[siteSel.selectedIndex]?.text),
+      line('今日の作業', contentInput.value.trim()),
+      line('完了した工程', proc),
+      line('使用材料', materialInput.value.trim()),
+      line('問題・追加工事', problemInput.value.trim()),
+      pending.length ? line('写真', `${pending.length}枚`) : null,
+      h('button', { class: 'btn', text: '✅ この内容で提出', onclick: doSubmit }),
+      h('button', { class: 'btn ghost', text: 'もどって直す', onclick: () => clear(document.getElementById('modal-root')) }),
+    ]));
   };
 
   const problemField = h('div', { class: 'field' }, [
-    h('label', { text: '⚠️ 問題・追加工事の報告' }),
-    problemInput,
+    h('label', { text: '⚠️ 問題・追加工事の報告（🎤 話して入力できます）' }),
+    h('div', { class: 'field-mic' }, [problemInput, micButton(problemInput)]),
     h('div', { class: 'hint', text: '口頭依頼のトラブル防止のため、追加工事は写真とともに残しましょう' }),
   ]);
   if (issueFocus) problemInput.setAttribute('autofocus', 'true');
@@ -304,7 +472,10 @@ export function renderReportForm(arg) {
       h('div', { class: 'field' }, [h('label', { text: '作業時間（h）' }), hoursInput]),
     ]),
     h('div', { class: 'field' }, [h('label', { text: '作業者' }), workerInput]),
-    h('div', { class: 'field' }, [h('label', { text: '作業内容' }), contentInput]),
+    h('div', { class: 'field' }, [h('label', { text: '作業内容（🎤 話して入力できます）' }),
+      h('div', { class: 'field-mic' }, [contentInput, micButton(contentInput)])]),
+    h('div', { class: 'field' }, [h('label', { text: '今日完了した工程' }), processSel,
+      h('div', { class: 'hint', text: '選ぶと工程表の進捗が進みます（前倒し/遅れの判定にも反映）' })]),
     h('div', { class: 'field' }, [h('label', { text: '使用材料' }), materialInput]),
     problemField,
     h('div', { class: 'field' }, [
@@ -318,7 +489,8 @@ export function renderReportForm(arg) {
 
   return h('div', {}, [
     h('button', { class: 'btn ghost sm', text: '← 戻る', onclick: () => history.back() }),
-    h('h1', { class: 'page-title', text: issueFocus ? '問題・追加工事の報告' : '日報を書く' }),
+    h('h1', { class: 'page-title', text: issueFocus ? '問題・追加工事の報告' : '今日 何しましたか？' }),
+    hintBanner('report', '🎤「話す」を押すと、声で入力できます。最後に「提出」を押す前に内容を確認できます。'),
     ...fields,
   ]);
 }

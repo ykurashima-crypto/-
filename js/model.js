@@ -19,11 +19,14 @@ export function statusInfo(key) {
   return STATUSES.find((s) => s.key === key) || { key, label: key, cls: '' };
 }
 
-// 写真フェーズ
+// 写真フェーズ（工程別分類）
 export const PHASES = [
   { key: 'before', label: '施工前', cls: 'phase-before' },
   { key: 'during', label: '施工中', cls: 'phase-during' },
   { key: 'after',  label: '施工後', cls: 'phase-after' },
+  { key: 'material', label: '材料缶', cls: 'phase-material' },
+  { key: 'defect', label: '不具合', cls: 'phase-defect' },
+  { key: 'extra',  label: '追加工事', cls: 'phase-extra' },
 ];
 export function phaseInfo(key) {
   return PHASES.find((p) => p.key === key) || PHASES[0];
@@ -86,7 +89,8 @@ export async function addPhoto({ siteId, reportId = null, phase, comment = '', f
   const blob = await downscaleToBlob(file);
   const id = uid('photo');
   await putBlob(id, blob);
-  return store.insert('photos', { id, siteId, reportId, phase, comment, size: blob.size });
+  const takenBy = localStorage.getItem('nurilog.worker') || '';
+  return store.insert('photos', { id, siteId, reportId, phase, comment, size: blob.size, takenBy });
 }
 
 // ---- 初回サンプルデータ投入 ----
@@ -137,5 +141,16 @@ export function seedIfEmpty() {
     address: '横浜市港北区日吉3-7', status: 'lead', manager: '佐藤',
     channel: 'Web', inquiryDate: '2026-06-12', surveyDate: '', estimateDate: '',
     estimateAmount: null, constructionStart: '', nextContact: '2026-06-14',
+  });
+
+  // 顧客サンプル（電話番号が案件と一致 → 顧客詳細の「案件履歴」に表示される）
+  const mkc = (id, o) => store.insertWithId('customers', { id, ...o });
+  mkc('seed_c_tanaka', {
+    name: '田中 健一', phone: '090-1234-5678', address: '横浜市青葉区美しが丘2-1',
+    channel: 'チラシ', inquiryDate: '2026-05-02', memo: '築15年・南面の色あせ気になる。日中不在、夕方連絡可',
+  });
+  mkc('seed_c_sato', {
+    name: '佐藤 隆', phone: '090-5555-1212', address: '横浜市戸塚区上倉田町8-2',
+    channel: 'リピーター', inquiryDate: '2026-04-10', memo: '前回（5年前）も外壁塗装。紹介もしてくれる優良客',
   });
 }

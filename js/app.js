@@ -1,13 +1,26 @@
 // アプリ本体: ロール切替・ハッシュルーター・タブバー制御。
 import { store } from './db.js';
 import { seedIfEmpty } from './model.js';
-import { clear } from './ui.js';
+import { clear, h, openModal } from './ui.js';
 import { renderWorkerHome } from './views/worker.js';
-import { renderAdminHome, renderCases } from './views/admin.js';
+import { renderAdminHome, renderCases, openCaseForm } from './views/admin.js';
 import { renderSite, renderReportForm, renderPhotoCapture } from './views/site.js';
+import { renderCustomers, renderCustomer } from './views/customers.js';
+import { renderSurvey } from './views/survey.js';
+import { renderProcess } from './views/process.js';
+import { renderSchedule } from './views/schedule.js';
+import { renderHoukoku } from './views/houkoku.js';
+import { renderTomorrow } from './views/tomorrow.js';
+import { renderPhotoReport } from './views/photoreport.js';
+import { renderApprove } from './views/extra.js';
+import { renderAi } from './views/ai.js';
+import { renderMembers } from './views/members.js';
+import { uiMode } from './roles.js';
 import { renderEstimate } from './views/estimate.js';
 import { renderSettings } from './views/settings.js';
 import { renderLogin } from './views/login.js';
+import { renderOnboarding, renderCloudOnboarding } from './views/onboarding.js';
+import { isOnboarded } from './company.js';
 import { initSync, onSyncEvent, syncState, syncNow } from './sync.js';
 import { cloudEnabled, initCloud, cloudState, currentRole, onCloud, signOut } from './cloud.js';
 
@@ -15,16 +28,19 @@ const ROLE_KEY = 'nurilog.role';
 
 const tabsByRole = {
   worker: [
-    { route: 'worker', icon: '🏠', label: 'ホーム' },
-    { route: 'photo',  icon: '📷', label: '写真' },
-    { route: 'report', icon: '📝', label: '日報' },
-    { route: 'settings', icon: '🔗', label: '共有' },
+    { route: 'worker',   icon: '🏠', label: '今日' },
+    { route: 'photo',    icon: '📷', label: '写真' },
+    { route: 'report',   icon: '📝', label: '日報' },
+    { route: 'houkoku',  icon: '📣', label: '報告' },
+    { route: 'tomorrow', icon: '📅', label: '明日' },
   ],
   admin: [
-    { route: 'admin',    icon: '📊', label: 'ダッシュ' },
-    { route: 'cases',    icon: '📋', label: '案件' },
-    { route: 'estimate', icon: '🧮', label: '見積' },
-    { route: 'settings', icon: '🔗', label: '共有' },
+    { route: 'admin',     icon: '📊', label: 'ダッシュ' },
+    { route: 'cases',     icon: '📋', label: '案件' },
+    { route: 'ai',        icon: '🤖', label: 'AI事務' },
+    { route: 'customers', icon: '👤', label: '顧客' },
+    { route: 'estimate',  icon: '🧮', label: '見積' },
+    { route: 'settings',  icon: '🔗', label: '共有' },
   ],
 };
 
@@ -34,10 +50,21 @@ function setRole(role) { localStorage.setItem(ROLE_KEY, role); }
 // route文字列 -> 描画関数
 const routes = {
   worker: () => renderWorkerHome(),
+  schedule: () => renderSchedule(),
+  houkoku: () => renderHoukoku(),
+  tomorrow: () => renderTomorrow(),
   photo: (id) => renderPhotoCapture(id),
   report: (id) => renderReportForm(id),
   admin: () => renderAdminHome(),
   cases: () => renderCases(),
+  customers: () => renderCustomers(),
+  customer: (id) => renderCustomer(id),
+  survey: (id) => renderSurvey(id),
+  process: (id) => renderProcess(id),
+  photodoc: (id) => renderPhotoReport(id),
+  approve: (id) => renderApprove(id),
+  ai: () => renderAi(),
+  members: () => renderMembers(),
   estimate: (id) => renderEstimate(id),
   settings: () => renderSettings(),
   site: (id) => renderSite(id),
@@ -46,15 +73,38 @@ const routes = {
 function parseHash() {
   const raw = location.hash.replace(/^#\/?/, '');
   const [route, arg] = raw.split('/');
-  return { route: route || (getRole() === 'admin' ? 'admin' : 'worker'), arg };
+  return { route: route || (uiMode(getRole()) === 'admin' ? 'admin' : 'worker'), arg };
 }
 
 export function navigate(path) { location.hash = '#/' + path; }
 
+// ── AI事務員 フローティングボタン（管理者モードのみ）──
+let fabEl = null;
+function showFab(on) {
+  if (!fabEl) {
+    fabEl = h('button', { class: 'ai-fab', text: '🤖 AI事務員', onclick: openAiMenu });
+    document.body.append(fabEl);
+  }
+  fabEl.style.display = on ? '' : 'none';
+}
+function aiItem(label, fn) {
+  return h('button', { class: 'btn secondary', style: 'margin-bottom:10px', text: label, onclick: () => { clear(document.getElementById('modal-root')); fn(); } });
+}
+function openAiMenu() {
+  openModal('何をしますか？', h('div', {}, [
+    h('p', { class: 'sub mt-0', text: 'よく使う操作です。重要な処理は確認画面が出ます。' }),
+    aiItem('🧾 案件・現場を登録する', () => openCaseForm(null, () => render())),
+    aiItem('🧮 見積を作る', () => navigate('estimate')),
+    aiItem('📣 顧客へ連絡（文面づくり）', () => navigate('ai')),
+    aiItem('📝 日報を作る', () => navigate('report')),
+    aiItem('💴 請求・入金を確認する', () => navigate('admin')),
+  ]));
+}
+
 function renderTabbar(activeRoute) {
   const bar = document.getElementById('tabbar');
   clear(bar);
-  for (const t of tabsByRole[getRole()]) {
+  for (const t of tabsByRole[uiMode(getRole())]) {
     const btn = document.createElement('button');
     btn.className = t.route === activeRoute ? 'active' : '';
     btn.innerHTML = `<span class="ic">${t.icon}</span><span>${t.label}</span>`;
@@ -67,22 +117,35 @@ function render() {
   const view = document.getElementById('view');
   const tabbar = document.getElementById('tabbar');
 
-  // 本番(クラウド)モードで未ログインならログイン画面のみ表示
-  if (cloudEnabled() && !cloudState().signedIn) {
-    clear(view);
-    tabbar.style.display = 'none';
-    view.append(renderLogin(() => { applyCloudRole(); render(); }));
+  // 本番(クラウド)モード: 未ログイン→ログイン/登録、ログイン済みで会社未所属→会社作成/参加
+  if (cloudEnabled()) {
+    const c = cloudState();
+    if (!c.signedIn) {
+      clear(view); tabbar.style.display = 'none'; showFab(false);
+      view.append(renderLogin(() => { applyCloudRole(); render(); }));
+      return;
+    }
+    if (!c.companyId) {
+      clear(view); tabbar.style.display = 'none'; showFab(false);
+      view.append(renderCloudOnboarding(() => { applyCloudRole(); render(); }));
+      return;
+    }
+  } else if (!isOnboarded()) {
+    // デモ(端末内保存)モード: 初回セットアップ
+    clear(view); tabbar.style.display = 'none'; showFab(false);
+    view.append(renderOnboarding(() => render()));
     return;
   }
   tabbar.style.display = '';
+  showFab(uiMode(getRole()) === 'admin'); // AI事務員は管理者モードのみ
 
   const { route, arg } = parseHash();
-  const fn = routes[route] || routes[getRole() === 'admin' ? 'admin' : 'worker'];
+  const fn = routes[route] || routes[uiMode(getRole()) === 'admin' ? 'admin' : 'worker'];
   clear(view);
   const node = fn(arg);
   if (node) view.append(node);
   // タブのアクティブ表示は主要タブのみ。詳細画面(site等)はホーム扱い。
-  const tabRoutes = tabsByRole[getRole()].map((t) => t.route);
+  const tabRoutes = tabsByRole[uiMode(getRole())].map((t) => t.route);
   renderTabbar(tabRoutes.includes(route) ? route : tabRoutes[0]);
   window.scrollTo(0, 0);
 }
@@ -106,7 +169,7 @@ function setupRoleSwitch() {
 }
 
 // 同期で他端末の変更が入ったら、閲覧系の画面だけ再描画（入力中フォームは触らない）
-const REFRESH_ROUTES = ['worker', 'admin', 'cases', 'site'];
+const REFRESH_ROUTES = ['worker', 'schedule', 'tomorrow', 'admin', 'cases', 'site', 'customers', 'customer', 'survey', 'process'];
 function onSynced() {
   const { route } = parseHash();
   if (REFRESH_ROUTES.includes(route)) render();
@@ -141,7 +204,9 @@ function applyCloudRole() {
 }
 
 async function boot() {
-  seedIfEmpty();
+  // デモデータは「デモ(端末内保存)モード」だけに投入する。
+  // 本番(クラウド)モードでは会社の実データのみを扱い、デモ用seedを混入させない。
+  if (!cloudEnabled()) seedIfEmpty();
   setupRoleSwitch();
   onSyncEvent(updateSyncBadge);
   updateSyncBadge();
@@ -158,7 +223,7 @@ async function boot() {
     initSync();
   }
 
-  if (!location.hash) navigate(getRole() === 'admin' ? 'admin' : 'worker');
+  if (!location.hash) navigate(uiMode(getRole()) === 'admin' ? 'admin' : 'worker');
   render();
 
   // Service Worker（オフライン対応）。ローカルfile://では失敗してもアプリは動作する。

@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node server/server.js",
-    "serve": "node server/server.js"
+    "serve": "node server/server.js",
+    "test": "node tests/run.mjs"
   },
   "engines": {
     "node": ">=20"
