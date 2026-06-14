@@ -12,6 +12,7 @@ const defaultData = {
   surveys: [],   // 現地調査
   processes: [], // 工程
   extras: [],    // 追加工事
+  members: [],   // メンバー名簿（職人・協力会社など）
 };
 
 function load() {
@@ -48,7 +49,7 @@ export function uid(_prefix = 'id') {
   return `${hex.slice(0, 4).join('')}-${hex.slice(4, 6).join('')}-${hex.slice(6, 8).join('')}-${hex.slice(8, 10).join('')}-${hex.slice(10, 16).join('')}`;
 }
 
-export const SYNC_COLLECTIONS = ['sites', 'reports', 'estimates', 'photos', 'customers', 'surveys', 'processes', 'extras'];
+export const SYNC_COLLECTIONS = ['sites', 'reports', 'estimates', 'photos', 'customers', 'surveys', 'processes', 'extras', 'members'];
 
 // 同期通知（ローカル変更時に共有同期をトリガーするためのフック）
 let onChange = null;

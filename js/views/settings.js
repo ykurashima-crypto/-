@@ -10,6 +10,18 @@ import { getCompany, setCompany, planLabel } from '../company.js';
 import { downscaleToBlob } from '../model.js';
 import { downloadBackup, importBackup, validateBackup } from '../backup.js';
 import { resetHints } from '../ui.js';
+import { navigate } from '../app.js';
+
+// 法人プラン向け: 職人・メンバー管理への導線。
+function membersCard() {
+  return h('div', {}, [
+    h('div', { class: 'section-title', text: 'メンバー（法人プラン）' }),
+    h('div', { class: 'card' }, [
+      h('p', { class: 'sub mt-0', text: '職人・協力会社を名簿に登録すると、案件の担当割当で選べます。' }),
+      h('button', { class: 'btn', text: '👷 職人・メンバー管理', onclick: () => navigate('members') }),
+    ]),
+  ]);
+}
 
 // データのバックアップ／復元カード。
 function backupCard() {
@@ -141,6 +153,7 @@ export function renderSettings() {
       !s.companyId ? h('div', { class: 'warn-box bad', text: '会社が未割当です。管理者がSupabaseでprofilesにcompanyIdを設定すると、データが表示されます。' }) : null,
       h('p', { class: 'sub', text: 'データは会社単位でクラウド保存され、別の端末からも同じ内容を確認できます。' }),
       companyCard(),
+      membersCard(),
       backupCard(),
     ]);
   }
@@ -216,6 +229,7 @@ export function renderSettings() {
     h('div', { class: 'section-title', text: 'この端末のデータ' }),
     counts,
     h('p', { class: 'sub', text: 'ヒント: PCでサーバーを起動し、職人さんのスマホで同じチームコードを入力すると、現場の写真・日報がリアルタイムに集約されます。' }),
+    membersCard(),
     backupCard(),
   ]);
 }

@@ -11,6 +11,7 @@ import { markInvoiced, markPaid } from '../money.js';
 import { CHANNELS } from './customers.js';
 import { renderCasesCalendar } from './calendar.js';
 import { micButton, parsePhone, parseDate } from '../voice.js';
+import { activeMembers } from './members.js';
 
 export function renderAdminHome() {
   // 請求・入金などの操作後に、ホームをその場で作り直して数字とアラートを最新化する。
@@ -318,8 +319,17 @@ export function openCaseForm(site, onDone, preset = null) {
     if (onDone) onDone();
   };
 
+  // 担当はメンバー名簿から選べる（自由入力も可）
+  const members = activeMembers();
+  if (members.length && f.manager) {
+    f.manager.setAttribute('list', 'nurilog-members');
+  }
+  const datalist = members.length
+    ? h('datalist', { id: 'nurilog-members' }, members.map((m) => h('option', { value: m.name })))
+    : null;
+
   const form = h('div', {}, [
-    ...baseFields, ...detailFields,
+    ...baseFields, ...detailFields, datalist,
     h('button', { class: 'btn', text: editing ? '更新する' : '登録する', onclick: save }),
   ]);
   openModal(editing ? '案件を編集' : '新規案件', form);

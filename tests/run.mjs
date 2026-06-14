@@ -201,6 +201,30 @@ test('upcomingSteps は未完了を予定日順に', () => {
   assert.equal(up[0].processType, '下塗り');
 });
 
+group('役割 / メンバー（法人）');
+test('役割の判定（現場系は金額を見ない・事務系は管理可）', async () => {
+  const r = await import(J('js/roles.js'));
+  assert.equal(r.uiMode('craftsman'), 'worker');
+  assert.equal(r.uiMode('manager'), 'admin');
+  assert.equal(r.canSeeMoney('craftsman'), false);
+  assert.equal(r.canSeeMoney('office'), true);
+  assert.equal(r.canManage('sales'), true);
+  assert.equal(r.canManage('partner'), false);
+  assert.equal(r.uiMode('worker'), 'worker'); // 旧称も現場系
+  assert.equal(r.uiMode('admin'), 'admin');
+});
+test('members が同期対象・有効/無効を管理', () => {
+  assert.ok(SYNC_COLLECTIONS.includes('members'));
+  reset();
+  const m = store.insert('members', { name: '山本', role: 'craftsman', active: true });
+  store.insert('members', { name: '退職者', role: 'craftsman', active: false });
+  const active = store.all('members').filter((x) => x.active !== false);
+  assert.equal(active.length, 1);
+  assert.equal(active[0].name, '山本');
+  store.update('members', m.id, { active: false });
+  assert.equal(store.all('members').filter((x) => x.active !== false).length, 0);
+});
+
 group('AI事務員（無料の下書き）');
 test('連絡文にお客様名・屋号・金額が差し込まれる', async () => {
   const { setCompany } = await import(J('js/company.js'));

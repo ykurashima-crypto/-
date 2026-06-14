@@ -142,6 +142,11 @@ update public.companies set invite_code = upper(substr(encode(gen_random_bytes(4
   where invite_code is null;
 create unique index if not exists idx_companies_invite on public.companies(invite_code);
 
+-- 役割の拡張（法人プランの7役割を許可）。既存のCHECKを張り替える。
+alter table public.profiles drop constraint if exists profiles_role_check;
+alter table public.profiles add constraint profiles_role_check
+  check (role in ('owner','admin','office','sales','manager','craftsman','partner','worker'));
+
 -- 顧客テーブルの拡張（問合せ経路・問合せ日・連絡先など）
 alter table public.customers add column if not exists channel       text;
 alter table public.customers add column if not exists inquiry_date  date;
@@ -212,6 +217,22 @@ create table if not exists public.extras (
 );
 create index if not exists idx_extras_company   on public.extras(company_id, updated_at);
 
+-- メンバー名簿（職人・協力会社など。ログインユーザー(profiles)とは別の名簿/ラベル）
+create table if not exists public.members (
+  id          uuid primary key default gen_random_uuid(),
+  company_id  uuid not null references public.companies(id) on delete cascade,
+  name        text,
+  role        text,
+  phone       text,
+  active      boolean not null default true,
+  note        text,
+  deleted     boolean not null default false,
+  created_by  uuid default auth.uid(),
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+create index if not exists idx_members_company  on public.members(company_id, updated_at);
+
 create index if not exists idx_sites_company     on public.sites(company_id, updated_at);
 create index if not exists idx_reports_company   on public.reports(company_id, updated_at);
 create index if not exists idx_estimates_company on public.estimates(company_id, updated_at);
@@ -231,7 +252,7 @@ end $$;
 do $$
 declare t text;
 begin
-  foreach t in array array['customers','sites','reports','estimates','photos','surveys','processes','extras'] loop
+  foreach t in array array['customers','sites','reports','estimates','photos','surveys','processes','extras','members'] loop
     execute format('drop trigger if exists trg_touch_%1$s on public.%1$s', t);
     execute format('create trigger trg_touch_%1$s before update on public.%1$s
                     for each row execute function public.touch_updated_at()', t);
@@ -264,6 +285,7 @@ alter table public.photos    enable row level security;
 alter table public.surveys   enable row level security;
 alter table public.processes enable row level security;
 alter table public.extras    enable row level security;
+alter table public.members   enable row level security;
 
 -- companies: 自社のみ閲覧
 drop policy if exists companies_select on public.companies;
@@ -283,7 +305,7 @@ create policy profiles_update on public.profiles
 do $$
 declare t text;
 begin
-  foreach t in array array['sites','customers','estimates','surveys','processes'] loop
+  foreach t in array array['sites','customers','estimates','surveys','processes','members'] loop
     execute format('drop policy if exists %1$s_select on public.%1$s', t);
     execute format('create policy %1$s_select on public.%1$s for select
                     using (company_id = public.current_company())', t);

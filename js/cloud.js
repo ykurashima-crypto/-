@@ -57,6 +57,7 @@ const MAP = {
   extras: { siteId: 'site_id', content: 'content', amount: 'amount', reason: 'reason',
     status: 'status', billed: 'billed', photoId: 'photo_id',
     approvedBy: 'approved_by', approvedAt: 'approved_at' },
+  members: { name: 'name', role: 'role', phone: 'phone', active: 'active', note: 'note' },
   reports: { siteId: 'site_id', date: 'date', worker: 'worker', workContent: 'work_content',
     materials: 'materials', hours: 'hours', problems: 'problems' },
   estimates: { siteId: 'site_id', total: 'total', sell: 'sell', profit: 'profit', margin: 'margin' },

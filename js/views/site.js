@@ -14,13 +14,14 @@ import { micButton } from '../voice.js';
 import { latestSurvey, surveySummary } from './survey.js';
 import { processProgress, siteProcesses, completeProcess } from './process.js';
 import { extraBlock } from './extra.js';
+import { canManage } from '../roles.js';
 
 // ---------- 現場詳細 ----------
 export function renderSite(siteId) {
   const s = store.get('sites', siteId);
   if (!s) return h('div', { class: 'empty', text: '現場が見つかりません' });
   const si = statusInfo(s.status);
-  const isAdmin = localStorage.getItem('nurilog.role') === 'admin';
+  const isAdmin = canManage(localStorage.getItem('nurilog.role') || 'worker');
 
   const photos = sitePhotos(s.id);
   const reports = siteReports(s.id);

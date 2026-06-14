@@ -14,6 +14,8 @@ import { renderTomorrow } from './views/tomorrow.js';
 import { renderPhotoReport } from './views/photoreport.js';
 import { renderApprove } from './views/extra.js';
 import { renderAi } from './views/ai.js';
+import { renderMembers } from './views/members.js';
+import { uiMode } from './roles.js';
 import { renderEstimate } from './views/estimate.js';
 import { renderSettings } from './views/settings.js';
 import { renderLogin } from './views/login.js';
@@ -62,6 +64,7 @@ const routes = {
   photodoc: (id) => renderPhotoReport(id),
   approve: (id) => renderApprove(id),
   ai: () => renderAi(),
+  members: () => renderMembers(),
   estimate: (id) => renderEstimate(id),
   settings: () => renderSettings(),
   site: (id) => renderSite(id),
@@ -70,7 +73,7 @@ const routes = {
 function parseHash() {
   const raw = location.hash.replace(/^#\/?/, '');
   const [route, arg] = raw.split('/');
-  return { route: route || (getRole() === 'admin' ? 'admin' : 'worker'), arg };
+  return { route: route || (uiMode(getRole()) === 'admin' ? 'admin' : 'worker'), arg };
 }
 
 export function navigate(path) { location.hash = '#/' + path; }
@@ -78,7 +81,7 @@ export function navigate(path) { location.hash = '#/' + path; }
 function renderTabbar(activeRoute) {
   const bar = document.getElementById('tabbar');
   clear(bar);
-  for (const t of tabsByRole[getRole()]) {
+  for (const t of tabsByRole[uiMode(getRole())]) {
     const btn = document.createElement('button');
     btn.className = t.route === activeRoute ? 'active' : '';
     btn.innerHTML = `<span class="ic">${t.icon}</span><span>${t.label}</span>`;
@@ -113,12 +116,12 @@ function render() {
   tabbar.style.display = '';
 
   const { route, arg } = parseHash();
-  const fn = routes[route] || routes[getRole() === 'admin' ? 'admin' : 'worker'];
+  const fn = routes[route] || routes[uiMode(getRole()) === 'admin' ? 'admin' : 'worker'];
   clear(view);
   const node = fn(arg);
   if (node) view.append(node);
   // タブのアクティブ表示は主要タブのみ。詳細画面(site等)はホーム扱い。
-  const tabRoutes = tabsByRole[getRole()].map((t) => t.route);
+  const tabRoutes = tabsByRole[uiMode(getRole())].map((t) => t.route);
   renderTabbar(tabRoutes.includes(route) ? route : tabRoutes[0]);
   window.scrollTo(0, 0);
 }
@@ -196,7 +199,7 @@ async function boot() {
     initSync();
   }
 
-  if (!location.hash) navigate(getRole() === 'admin' ? 'admin' : 'worker');
+  if (!location.hash) navigate(uiMode(getRole()) === 'admin' ? 'admin' : 'worker');
   render();
 
   // Service Worker（オフライン対応）。ローカルfile://では失敗してもアプリは動作する。
